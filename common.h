@@ -14,7 +14,7 @@
 #include <ctype.h>
 
 #define KasjerKanal 1
-#define NUM_CLIENTS 10
+#define NUM_CLIENTS 3
 
 
 struct message {
