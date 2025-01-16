@@ -19,7 +19,7 @@ int main() {
         perror("msgget");
         exit(1);
     }
-
+    sleep(2);
     printf("Kasjer gotowy do odbierania wiadomości...\n");
 
     while (1) {
@@ -29,7 +29,7 @@ int main() {
             exit(1);
         }
         printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
-
+        sleep(1);
         // Przygotowanie odpowiedzi do klienta
         msg.mtype = msg.pid;  // Typ komunikatu to PID klienta
         msg.pid = msg.pid;  // Typ komunikatu to PID klienta
