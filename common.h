@@ -12,10 +12,11 @@
 #include <pthread.h>
 #include <time.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #define KasjerKanal 1
-#define NUM_CLIENTS 3
-
+#define NUM_CLIENTS 10
+#define VIP_CODE 1
 
 struct message {
     long mtype; // Typ wiadomości

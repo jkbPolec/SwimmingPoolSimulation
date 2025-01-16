@@ -1,8 +1,12 @@
 #include "common.h"
 
-int main() {
-    key_t key;
-    int msgid;
+struct clientData {
+    int age;
+    bool isVIP;
+};
+
+void queueRoutine() {
+    int key, msgid;
     struct message msg;
 
     // Generowanie klucza do kolejki
@@ -36,6 +40,32 @@ int main() {
         exit(1);
     }
     printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
+
+
+}
+
+
+int main() {
+    key_t key;
+    int msgid, chosenPool;
+    struct message msg;
+    struct clientData clientData;
+    pid_t myPid;
+
+    myPid = getpid();
+    srand(time(NULL) + myPid);
+    clientData.age = rand() % 70 + 1;
+    int VIP = rand() % 100 + 1;
+    if (VIP == 1) {clientData.isVIP = true;}
+
+    chosenPool = rand() % 3 + 1;
+
+    if (VIP != VIP_CODE) {
+        queueRoutine();
+    }
+
+
+
 
     return 0;
 }
