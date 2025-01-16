@@ -24,8 +24,8 @@ void queueRoutine() {
     }
 
     // Wysyłanie komunikatu z PID-em klienta do kasjera
-    msg.mtype = 1;  // Typ komunikatu (1 oznacza komunikat do kasjera)
-    msg.pid = getpid(); // PID klienta
+    msg.mtype = CASHIER_CHANNEL;
+    msg.pid = getpid();
 
     if (msgsnd(msgid, &msg, sizeof(msg.pid), 0) == -1) {
         perror("msgsnd");
@@ -46,9 +46,7 @@ void queueRoutine() {
 
 
 int main() {
-    key_t key;
-    int msgid, chosenPool;
-    struct message msg;
+    int chosenPool;
     struct clientData clientData;
     pid_t myPid;
 
@@ -57,7 +55,6 @@ int main() {
     clientData.age = rand() % 70 + 1;
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
-
     chosenPool = rand() % 3 + 1;
 
     if (VIP != VIP_CODE) {

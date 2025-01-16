@@ -19,20 +19,20 @@ int main() {
         perror("msgget");
         exit(1);
     }
+
     sleep(2);
     printf("Kasjer gotowy do odbierania wiadomości...\n");
 
     while (1) {
         // Odbieranie wiadomości od klienta
-        if (msgrcv(msgid, &msg, sizeof(msg.pid), 1, 0) == -1) {
+        if (msgrcv(msgid, &msg, sizeof(msg.pid), CASHIER_CHANNEL, 0) == -1) {
             perror("msgrcv");
             exit(1);
         }
         printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
         sleep(1);
-        // Przygotowanie odpowiedzi do klienta
-        msg.mtype = msg.pid;  // Typ komunikatu to PID klienta
-        msg.pid = msg.pid;  // Typ komunikatu to PID klienta
+        // Odsyłanie klientowi wiadomosci, na jego PID
+        msg.mtype = msg.pid;
 
         // Wysyłanie odpowiedzi do klienta
         if (msgsnd(msgid, &msg, sizeof(msg.pid), 0) == -1) {

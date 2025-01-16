@@ -14,11 +14,19 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#define KasjerKanal 1
+#define CASHIER_CHANNEL 1
 #define NUM_CLIENTS 10
 #define VIP_CODE 1
+#define R_POOL_SIZE 100
 
 struct message {
     long mtype; // Typ wiadomości
     pid_t pid;  // PID procesu (klienta lub kasjera)
 };
+
+struct RecreationPoolStruct {
+    int client_count;
+    int total_age;
+    int pids[R_POOL_SIZE];
+};
+
