@@ -3,20 +3,21 @@ CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c99
 
 # Nazwy plików wykonywalnych
-TARGETS = kasjer klient main
+TARGETS = kasjer klient main ratownik
 
 # Pliki źródłowe i nagłówkowe
 COMMON_HEADER = common.h
 KASJER_SRC = kasjer.c
 KLIENT_SRC = klient.c
 MAIN_SRC = main.c
+RATOWNIK_SRC = ratownik.c
 
 # Reguła domyślna
 all: $(TARGETS)
 
 # Kompilacja main
 main: $(MAIN_SRC) $(COMMON_HEADER)
-	$(CC) $(CFLAGS) -o $@ main.c
+	$(CC) $(CFLAGS) -o $@ $(MAIN_SRC)
 
 # Kompilacja kasjera
 kasjer: $(KASJER_SRC) $(COMMON_HEADER)
@@ -25,6 +26,10 @@ kasjer: $(KASJER_SRC) $(COMMON_HEADER)
 # Kompilacja klienta
 klient: $(KLIENT_SRC) $(COMMON_HEADER)
 	$(CC) $(CFLAGS) -o $@ $(KLIENT_SRC)
+
+# Kompilacja ratownika
+ratownik: $(RATOWNIK_SRC) $(COMMON_HEADER)
+	$(CC) $(CFLAGS) -o $@ $(RATOWNIK_SRC)
 
 # Czyszczenie plików wykonywalnych
 clean:

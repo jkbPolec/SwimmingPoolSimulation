@@ -2,46 +2,18 @@
 
 void createCashier();
 void createClients();
-
+void createLifeguards();
 
 int main() {
-    int shKey, shmid;
-    struct RecreationPoolStruct *rpoolStruct;
-
-    //-------------------Tworzenie pamieci dzielonej basenu rekreacyjnego
-    shKey = ftok("shmfile", 65);
-    if (shKey == -1) {
-        perror("ftok");
-        exit(1);
-    }
-
-    shmid = shmget(shKey, sizeof(struct RecreationPoolStruct), 0600 | IPC_CREAT);
-    if (shmid == -1) {
-        perror("shmget");
-        exit(1);
-    }
-
-    rpoolStruct = (struct RecreationPoolStruct *) shmat(shmid, NULL, 0);
-    if (rpoolStruct == (void *)-1) {
-        perror("shmat");
-        exit(1);
-    }
-
-    rpoolStruct->client_count = 10;
-    rpoolStruct->total_age = 40;
-    rpoolStruct->pids[0] = 1234;
-
-    printf("Zapisano w pamięci dzielonej:\n");
-    printf("Client count: %d\n", rpoolStruct->client_count);
-    printf("Total age: %d\n", rpoolStruct->total_age);
-    printf("Message: %d\n", rpoolStruct->pids[0]);
-
 
     //-------------------Tworzenie kasjera
     createCashier();
 
     //-------------------Tworzenie klientow
     createClients();
+
+    //-------------------Tworzenie ratowników
+    createLifeguards();
 
     //-------------------Czekanie az wszystkie procesy sie skoncza
     for (int i = 0; i < NUM_CLIENTS + 1; i++) {
@@ -86,3 +58,30 @@ void createClients() {
     }
 }
 
+void createLifeguards() {
+    const int poolCodes[] = {RECREATIONAL_POOL_CODE, KIDS_POOL_CODE, OLYMPIC_POOL_CODE};
+    const char *messages[] = {
+            "Tworzę proces ratownika b.rekreacyjnego ...\n",
+            "Tworzę proces ratownika b.brodzika ...\n",
+            "Tworzę proces ratownika b.olimpijskiego ...\n"
+    };
+
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            perror("Fork failed for ratownik");
+            exit(1);
+        }
+
+        if (pid == 0) {
+            printf("%s", messages[i]);
+
+            char str_value[4];
+            snprintf(str_value, sizeof(str_value), "%d", poolCodes[i]);
+            execl("./ratownik", "ratownik", str_value, (char *)NULL);
+
+            perror("execl ratownika failed");
+            exit(1);
+        }
+    }
+}

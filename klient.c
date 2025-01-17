@@ -1,8 +1,9 @@
 #include "common.h"
 
-struct clientData {
+struct ClientData {
     int age;
     bool isVIP;
+    bool inPool;
 };
 
 void queueRoutine() {
@@ -42,12 +43,13 @@ void queueRoutine() {
     printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
 
 
+
 }
 
 
 int main() {
     int chosenPool;
-    struct clientData clientData;
+    struct ClientData clientData;
     pid_t myPid;
 
     myPid = getpid();
@@ -55,11 +57,69 @@ int main() {
     clientData.age = rand() % 70 + 1;
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
+    clientData.inPool = false;
     chosenPool = rand() % 3 + 1;
+    switch (chosenPool) {
+        case 1:
+            chosenPool = RECREATIONAL_POOL_CODE;
+            break;
+        case 2:
+            chosenPool = KIDS_POOL_CODE;
+            break;
+        case 3:
+            chosenPool = OLYMPIC_POOL_CODE;
+            break;
+        default:
+            fprintf(stderr,"Pool like this, doesnt exist\n");
+            exit(1);
+    }
+
 
     if (VIP != VIP_CODE) {
         queueRoutine();
     }
+
+
+    struct LifeguardMessage lfgMsg;
+    int lfgMsgID, shKey;
+
+
+    //-------------------Tworzenie kolejki komunikatow do basenu
+    shKey = ftok("shmfile", 65);
+    if (shKey == -1) {
+        perror("ftok");
+        exit(1);
+    }
+
+    lfgMsgID = msgget(shKey, 0600);
+    if (lfgMsgID == -1) {
+        perror("msgget");
+        exit(1);
+    }
+
+    lfgMsg.pid = getpid();
+    lfgMsg.age = clientData.age;
+    lfgMsg.mtype = chosenPool;
+
+    // Wysłanie zapytania do ratownika
+    if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
+        perror("msgsnd");
+        exit(1);
+    }
+
+    if (msgrcv(lfgMsgID, &lfgMsg, sizeof (struct  LifeguardMessage) - sizeof (long), getpid(), 0) == -1) {
+        perror("msgrcv");
+        exit(1);
+    }
+
+
+    // Wyświetlenie wyniku
+    if (lfgMsg.allowed) {
+        printf("Klient PID: %d wchodzi na basen!\n", getpid());
+    } else {
+        printf("Klient PID: %d nie wchodzi na basen.\n", getpid());
+    }
+
 
 
 
