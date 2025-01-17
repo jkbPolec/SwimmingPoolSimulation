@@ -2,10 +2,11 @@
 
 
 
-void setUpLifeguard(char *code);
-void setUpIPC();
-void* clientIn();
-void clientOut();
+void SetUpLifeguard(char *code);
+void SetUpIPC();
+void* ClientIn();
+void* ClientOut();
+void PrintPoolPids();
 
 int poolChannelEnter, poolChannelExit, poolSize;
 int shKey, shmid;
@@ -23,16 +24,21 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    setUpLifeguard(argv[1]);
-    setUpIPC();
+    SetUpLifeguard(argv[1]);
+    SetUpIPC();
 
-    if (pthread_create(&lifegaurdInThread, NULL, clientIn, "") != 0) {
+    if (pthread_create(&lifegaurdInThread, NULL, ClientIn, "") != 0) {
+        perror("pthread_create");
+        exit(1);
+    }
+
+    if (pthread_create(&lifegaurdOutThread, NULL, ClientOut, "") != 0) {
         perror("pthread_create");
         exit(1);
     }
 
     pthread_join(lifegaurdInThread, NULL);
-
+    pthread_join(lifegaurdOutThread, NULL);
 
     printf("Wszystkie watki zakonczyly dzialanie\n");
 
@@ -51,7 +57,7 @@ int main(int argc, char *argv[]) {
 }
 
 
-void setUpLifeguard(char *code) {
+void SetUpLifeguard(char *code) {
 
 
 
@@ -85,7 +91,7 @@ void setUpLifeguard(char *code) {
 
 
 }
-void setUpIPC() {
+void SetUpIPC() {
 
 
     //-------------------Tworzenie pamieci dzielonej basenu
@@ -143,7 +149,7 @@ void setUpIPC() {
 
 
 }
-void* clientIn() {
+void* ClientIn() {
 
     while (1) {
         // Odbieranie zapytania od klienta
@@ -166,8 +172,10 @@ void* clientIn() {
 
         if (new_count <= poolSize && new_avg_age <= MAX_AGE && ageFlag) {
             // Klient może wejść do basenu
+            pool->pids[pool->client_count] = msg.pid;
             pool->client_count++;
             pool->total_age += msg.age;
+
             msg.allowed = 1;
             printf("Klient PID: %d wpuszczony do basenu %d.\n", msg.pid, poolChannelEnter);
         } else {
@@ -189,9 +197,70 @@ void* clientIn() {
             perror("msgsnd");
             exit(1);
         }
+
+        PrintPoolPids();
     }
 
 }
-void clientOut() {
+void* ClientOut() {
+    int client_pid, found, client_age;
+    found = 0;
 
+    while (1) {
+        // Odbieranie zapytania od klienta
+        if (msgrcv(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelExit, 0) == -1) {
+            perror("msgrcv");
+            exit(1);
+        }
+
+        client_pid = msg.pid;
+        client_age = msg.age;
+
+        printf("Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", msg.pid, msg.age);
+
+        // Szukanie klienta w tablicy PID
+        for (int i = 0; i < pool->client_count; i++) {
+            if (pool->pids[i] == client_pid) {
+                found = 1;
+
+                // Usunięcie klienta przez przesunięcie elementów w tablicy
+                for (int j = i; j < pool->client_count - 1; j++) {
+                    pool->pids[j] = pool->pids[j + 1];
+                }
+
+                // Aktualizacja danych basenu
+                pool->client_count--;
+                pool->total_age -= client_age;
+
+                printf("Klient PID: %d opuścił basen.\n", client_pid);
+                break;
+            }
+        }
+
+        if (found) {
+
+            printf("Klient PID: %d dostal pozowlenie na opuszczenie basenu.\n", client_pid);
+            msg.allowed = 1;
+        }
+        else
+        {
+            printf("Klient PID: %d nie został znaleziony w basenie.\n", client_pid);
+            msg.allowed = 0;
+        }
+        // Wysyłanie odpowiedzi do klienta
+        msg.mtype = msg.pid; // Typ wiadomości odpowiada PID klienta
+        if (msgsnd(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
+            perror("msgsnd");
+            exit(1);
+        }
+        PrintPoolPids();
+    }
+}
+
+
+void PrintPoolPids() {
+    printf("Lista PID klientów w basenie:\n");
+    for (int i = 0; i < pool->client_count; i++) {
+        printf("Klient %d: PID = %d\n", i + 1, pool->pids[i]);
+    }
 }
