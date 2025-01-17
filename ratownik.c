@@ -239,7 +239,7 @@ void* ClientOut() {
 
         if (found) {
 
-            printf("Klient PID: %d dostal pozowlenie na opuszczenie basenu.\n", client_pid);
+            printf("Klient PID: %d dostal pozwolenie na opuszczenie basenu.\n", client_pid);
             msg.allowed = 1;
         }
         else

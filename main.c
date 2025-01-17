@@ -1,19 +1,19 @@
 #include "common.h"
 
-void createCashier();
-void createClients();
-void createLifeguards();
+void CreateCashier();
+void CreateClients();
+void CreateLifeguards();
 
 int main() {
 
     //-------------------Tworzenie kasjera
-    createCashier();
+    CreateCashier();
 
     //-------------------Tworzenie ratowników
-    createLifeguards();
+    CreateLifeguards();
     sleep(1);
     //-------------------Tworzenie klientow
-    createClients();
+    CreateClients();
 
 
 
@@ -27,7 +27,7 @@ int main() {
     return 0;
 }
 
-void createCashier() {
+void CreateCashier() {
     pid_t pid = fork();
     if (pid < 0) {
         perror("Fork failed for kasjer");
@@ -42,7 +42,7 @@ void createCashier() {
     }
 }
 
-void createClients() {
+void CreateClients() {
     pid_t pid;
     for (int i = 0; i < NUM_CLIENTS; i++) {
         pid = fork();
@@ -60,7 +60,7 @@ void createClients() {
     }
 }
 
-void createLifeguards() {
+void CreateLifeguards() {
     const int poolCodes[] = {RECREATIONAL_POOL_CODE, KIDS_POOL_CODE, OLYMPIC_POOL_CODE};
     const char *messages[] = {
             "Tworzę proces ratownika b.rekreacyjnego ...\n",

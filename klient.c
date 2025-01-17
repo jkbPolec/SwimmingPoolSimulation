@@ -11,6 +11,9 @@ void QueueRoutine();
 bool EnterPool();
 bool ExitPool();
 
+void *MonitorTime(void*);
+void TimeHandler(int sig);
+
 
 int enterPoolChannel,exitPoolChannel, chosenPool;
 struct ClientData clientData;
@@ -18,8 +21,12 @@ int VIP;
 pid_t myPid;
 struct LifeguardMessage lfgMsg;
 int lfgMsgID,  msgKey;
+pthread_t moniotorThread;
+bool leaveFlag = false;
 
 int main() {
+
+    signal(34, TimeHandler);
 
     SetUpClient();
 
@@ -27,18 +34,24 @@ int main() {
         QueueRoutine();
     }
 
-    /*
-    while(!EnterPool())
+    time_t start_time = time(NULL);
+    if(pthread_create(&moniotorThread, NULL, MonitorTime, (void*)&start_time) != 0)
+    {
+        perror("pthread_create monitor");
+        exit(1);
+    }
+
+
+    while(!(clientData.inPool = EnterPool()))
     {
         sleep(5);
     }
-    */
 
-    clientData.age = 20;
-    EnterPool();
-    sleep(5);
 
-    ExitPool();
+    while (!leaveFlag)
+    {
+
+    }
 
 
     return 0;
@@ -47,7 +60,8 @@ int main() {
 void SetUpClient() {
     myPid = getpid();
     srand(time(NULL) + myPid);
-    clientData.age = rand() % 70 + 1;
+    //TODO zmienic zakres
+    clientData.age = rand() % 30 + 1;
     VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
     clientData.inPool = false;
@@ -194,3 +208,40 @@ bool ExitPool() {
     }
 }
 
+void *MonitorTime(void *arg) {
+    printf("Start watku\n");
+    time_t start_time = *(time_t *)arg;  // Czas startu procesu
+    time_t current_time;
+    double elapsed_time;
+    struct tm *local_time;
+
+    while (true) {
+        current_time = time(NULL);  // Pobieramy aktualny czas w sekundach od epoki UNIX
+        elapsed_time = difftime(current_time, start_time);
+
+        // Sprawdzanie, czy minęło 10 sekund
+        if (elapsed_time >= 5) {
+            printf("Minęło 5 sekund od startu programu!\n");
+            raise(34);
+            break;
+        }
+
+        // Sprawdzanie, czy jest godzina 18:00
+        local_time = localtime(&current_time);  // Konwersja na czas lokalny
+        if (local_time->tm_hour == 18 && local_time->tm_min == 0 && local_time->tm_sec == 0) {
+            printf("Jest dokładnie godzina 18:00!\n");
+        }
+    }
+
+    return NULL;
+}
+
+void TimeHandler(int sig) {
+    printf("Sygnal do wyjscia!\n");
+    if (clientData.inPool)
+    {
+        ExitPool();
+    }
+    leaveFlag = true;
+    return;
+}
