@@ -9,11 +9,13 @@ int main() {
     //-------------------Tworzenie kasjera
     createCashier();
 
+    //-------------------Tworzenie ratowników
+    createLifeguards();
+    sleep(1);
     //-------------------Tworzenie klientow
     createClients();
 
-    //-------------------Tworzenie ratowników
-    createLifeguards();
+
 
     //-------------------Czekanie az wszystkie procesy sie skoncza
     for (int i = 0; i < NUM_CLIENTS + 1; i++) {

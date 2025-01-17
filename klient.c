@@ -6,7 +6,55 @@ struct ClientData {
     bool inPool;
 };
 
-void queueRoutine() {
+void QueueRoutine();
+bool EnterPool(struct ClientData, int);
+
+int main() {
+    int chosenPool;
+    struct ClientData clientData;
+    pid_t myPid;
+
+    myPid = getpid();
+    srand(time(NULL) + myPid);
+    clientData.age = rand() % 70 + 1;
+    int VIP = rand() % 100 + 1;
+    if (VIP == 1) {clientData.isVIP = true;}
+    clientData.inPool = false;
+    chosenPool = rand() % 3 + 1;
+
+
+
+    switch (chosenPool) {
+        case 1:
+            chosenPool = RECREATIONAL_LIFEGAURD_CHANNEL;
+            break;
+        case 2:
+            chosenPool = KIDS_LIFEGAURD_CHANNEL;
+            break;
+        case 3:
+            chosenPool = OLYMPIC_LIFEGAURD_CHANNEL;
+            break;
+        default:
+            fprintf(stderr,"Pool like this, doesnt exist\n");
+            exit(1);
+    }
+
+
+    if (VIP != VIP_CODE) {
+        QueueRoutine();
+    }
+
+    while(!EnterPool(clientData, chosenPool))
+    {
+        sleep(5);
+    }
+
+
+    return 0;
+}
+
+
+void QueueRoutine() {
     int key, msgid;
     struct message msg;
 
@@ -43,63 +91,34 @@ void queueRoutine() {
     printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
 
 
-
 }
 
-
-int main() {
-    int chosenPool;
-    struct ClientData clientData;
-    pid_t myPid;
-
-    myPid = getpid();
-    srand(time(NULL) + myPid);
-    clientData.age = rand() % 70 + 1;
-    int VIP = rand() % 100 + 1;
-    if (VIP == 1) {clientData.isVIP = true;}
-    clientData.inPool = false;
-    chosenPool = rand() % 3 + 1;
-    switch (chosenPool) {
-        case 1:
-            chosenPool = RECREATIONAL_POOL_CODE;
-            break;
-        case 2:
-            chosenPool = KIDS_POOL_CODE;
-            break;
-        case 3:
-            chosenPool = OLYMPIC_POOL_CODE;
-            break;
-        default:
-            fprintf(stderr,"Pool like this, doesnt exist\n");
-            exit(1);
-    }
-
-
-    if (VIP != VIP_CODE) {
-        queueRoutine();
-    }
-
-
+bool EnterPool(struct ClientData clientData, int chosenPool)
+{
     struct LifeguardMessage lfgMsg;
-    int lfgMsgID, shKey;
+    int lfgMsgID,  msgKey;
 
 
     //-------------------Tworzenie kolejki komunikatow do basenu
-    shKey = ftok("shmfile", 65);
-    if (shKey == -1) {
+    msgKey = ftok("queuefile", 65);
+    if (msgKey == -1) {
         perror("ftok");
         exit(1);
     }
 
-    lfgMsgID = msgget(shKey, 0600);
+    lfgMsgID = msgget(msgKey, 0600);
     if (lfgMsgID == -1) {
         perror("msgget");
         exit(1);
     }
 
+    lfgMsg.mtype = chosenPool;
     lfgMsg.pid = getpid();
     lfgMsg.age = clientData.age;
-    lfgMsg.mtype = chosenPool;
+
+    printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
+
+
 
     // Wysłanie zapytania do ratownika
     if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
@@ -115,14 +134,14 @@ int main() {
 
     // Wyświetlenie wyniku
     if (lfgMsg.allowed) {
-        printf("Klient PID: %d wchodzi na basen!\n", getpid());
+        printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), chosenPool);
+        return true;
     } else {
-        printf("Klient PID: %d nie wchodzi na basen.\n", getpid());
+        printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), chosenPool);
+        return false;
     }
 
 
 
 
-
-    return 0;
 }

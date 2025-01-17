@@ -20,7 +20,6 @@ int main() {
         exit(1);
     }
 
-    sleep(2);
     printf("Kasjer gotowy do odbierania wiadomości...\n");
 
     while (1) {
