@@ -2,27 +2,39 @@
 
 
 
-void setUpLifeguard(int argc, char *argv[]);
+void setUpLifeguard(char *code);
 void setUpIPC();
-void clientIn();
+void* clientIn();
 void clientOut();
 
-int poolChannel, poolSize;
+int poolChannelEnter, poolChannelExit, poolSize;
 int shKey, shmid;
 int msgid, msgKey;
 struct PoolStruct *pool;
 struct LifeguardMessage msg;
+pthread_t lifegaurdInThread, lifegaurdOutThread;
+
 
 
 int main(int argc, char *argv[]) {
 
+    if (argc < 2) {
+        printf("Zła liczba argumentów ratownika\n");
+        exit(1);
+    }
 
-
-    setUpLifeguard(argc, argv);
+    setUpLifeguard(argv[1]);
     setUpIPC();
 
-    clientIn();
+    if (pthread_create(&lifegaurdInThread, NULL, clientIn, "") != 0) {
+        perror("pthread_create");
+        exit(1);
+    }
 
+    pthread_join(lifegaurdInThread, NULL);
+
+
+    printf("Wszystkie watki zakonczyly dzialanie\n");
 
 
     // Odłączenie pamięci dzielonej
@@ -39,33 +51,33 @@ int main(int argc, char *argv[]) {
 }
 
 
-void setUpLifeguard(int argc, char *argv[]) {
+void setUpLifeguard(char *code) {
 
-    if (argc < 2) {
-        printf("Zła liczba argumentów ratownika\n");
-        exit(1);
-    }
 
-    int poolCode = atoi(argv[1]);
+
+    int poolCode = atoi(code);
 
     switch (poolCode) {
         case RECREATIONAL_POOL_CODE:
             poolSize = RECREATIONAL_POOL_SIZE;
-            poolChannel = RECREATIONAL_LIFEGAURD_CHANNEL;
+            poolChannelEnter = RECREATIONAL_ENTER_CHANNEL;
+            poolChannelExit = RECREATIONAL_EXIT_CHANNEL;
             printf("Stworzono ratownika b.rekreacyjnego\n");
             break;
         case KIDS_POOL_CODE:
             poolSize = KIDS_POOL_SIZE;
-            poolChannel = KIDS_LIFEGAURD_CHANNEL;
+            poolChannelEnter = KIDS_ENTER_CHANNEL;
+            poolChannelExit = KIDS_EXIT_CHANNEL;
             printf("Stworzono ratownika b.brodzik\n");
             break;
         case OLYMPIC_POOL_CODE:
             poolSize = OLYMPIC_POOL_SIZE;
-            poolChannel = OLYMPIC_LIFEGAURD_CHANNEL;
+            poolChannelEnter = OLYMPIC_ENTER_CHANNEL;
+            poolChannelExit = OLYMPIC_EXIT_CHANNEL;
             printf("Stworzono ratownika b.olimpijskiego\n");
             break;
         default:
-            fprintf(stderr, "Niepoprawny typ basenu: %s\n", argv[1]);
+            fprintf(stderr, "Niepoprawny typ basenu: %s\n", code);
             exit(1);
     }
 
@@ -78,10 +90,10 @@ void setUpIPC() {
 
     //-------------------Tworzenie pamieci dzielonej basenu
 
-    if (poolChannel == RECREATIONAL_POOL_CODE) {
+    if (poolChannelEnter == RECREATIONAL_POOL_CODE) {
         shKey = ftok("poolRec", 65);
     }
-    else if (poolChannel == KIDS_POOL_CODE) {
+    else if (poolChannelEnter == KIDS_POOL_CODE) {
         shKey = ftok("poolKid", 65);
     }
     else {
@@ -131,11 +143,11 @@ void setUpIPC() {
 
 
 }
-void clientIn() {
+void* clientIn() {
 
     while (1) {
         // Odbieranie zapytania od klienta
-        if (msgrcv(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), poolChannel, 0) == -1) {
+        if (msgrcv(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelEnter, 0) == -1) {
             perror("msgrcv");
             exit(1);
         }
@@ -148,7 +160,7 @@ void clientIn() {
         int new_avg_age = (new_count > 0) ? (new_total_age / new_count) : 0;
         bool ageFlag = true;
 
-        if (poolChannel == OLYMPIC_LIFEGAURD_CHANNEL && msg.age < 18) {
+        if (poolChannelEnter == OLYMPIC_ENTER_CHANNEL && msg.age < 18) {
             ageFlag = false;
         }
 
@@ -157,11 +169,11 @@ void clientIn() {
             pool->client_count++;
             pool->total_age += msg.age;
             msg.allowed = 1;
-            printf("Klient PID: %d wpuszczony do basenu %d.\n", msg.pid, poolChannel);
+            printf("Klient PID: %d wpuszczony do basenu %d.\n", msg.pid, poolChannelEnter);
         } else {
             // Klient nie może wejść do basenu
             msg.allowed = 0;
-            printf("Klient PID: %d nie został wpuszczony do basenu %d. Powód: ", msg.pid, poolChannel);
+            printf("Klient PID: %d nie został wpuszczony do basenu %d. Powód: ", msg.pid, poolChannelEnter);
             if (!ageFlag) {
                 printf("nie jestes dorosly.\n");
             } else if (new_count > poolSize) {

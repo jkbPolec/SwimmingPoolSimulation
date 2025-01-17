@@ -16,9 +16,13 @@
 
 
 #define CASHIER_CHANNEL                 101
-#define RECREATIONAL_LIFEGAURD_CHANNEL  201
-#define KIDS_LIFEGAURD_CHANNEL          202
-#define OLYMPIC_LIFEGAURD_CHANNEL       203
+
+#define RECREATIONAL_ENTER_CHANNEL  211
+#define RECREATIONAL_EXIT_CHANNEL  212
+#define KIDS_ENTER_CHANNEL          221
+#define KIDS_EXIT_CHANNEL          222
+#define OLYMPIC_ENTER_CHANNEL       231
+#define OLYMPIC_EXIT_CHANNEL       232
 
 #define RECREATIONAL_POOL_CODE          301
 #define KIDS_POOL_CODE                  302
@@ -37,10 +41,11 @@ struct message {
 };
 
 struct LifeguardMessage {
-    long mtype;          // Typ wiadomości (do ratownika lub klienta)
+    long mtype;         // Typ wiadomości (do ratownika lub klienta)
     pid_t pid;
     int age;
-    int allowed;         //1 - wejście dozwolone, 0 - zabronione
+    int allowed;        //1 - wejście dozwolone, 0 - zabronione
+    int is_exit;        //1 - wychodzi z basenu, 0 - wchodzi do basenu
 };
 
 struct PoolStruct {

@@ -7,12 +7,14 @@ struct ClientData {
 };
 
 void QueueRoutine();
-bool EnterPool(struct ClientData, int);
+bool EnterPool();
+
+int enterPoolChannel,exitPoolChannel;
+struct ClientData clientData;
+int chosenPool;
+pid_t myPid;
 
 int main() {
-    int chosenPool;
-    struct ClientData clientData;
-    pid_t myPid;
 
     myPid = getpid();
     srand(time(NULL) + myPid);
@@ -26,13 +28,13 @@ int main() {
 
     switch (chosenPool) {
         case 1:
-            chosenPool = RECREATIONAL_LIFEGAURD_CHANNEL;
+            enterPoolChannel = RECREATIONAL_ENTER_CHANNEL;
             break;
         case 2:
-            chosenPool = KIDS_LIFEGAURD_CHANNEL;
+            enterPoolChannel = KIDS_ENTER_CHANNEL;
             break;
         case 3:
-            chosenPool = OLYMPIC_LIFEGAURD_CHANNEL;
+            enterPoolChannel = OLYMPIC_ENTER_CHANNEL;
             break;
         default:
             fprintf(stderr,"Pool like this, doesnt exist\n");
@@ -44,7 +46,7 @@ int main() {
         QueueRoutine();
     }
 
-    while(!EnterPool(clientData, chosenPool))
+    while(!EnterPool())
     {
         sleep(5);
     }
@@ -93,7 +95,7 @@ void QueueRoutine() {
 
 }
 
-bool EnterPool(struct ClientData clientData, int chosenPool)
+bool EnterPool()
 {
     struct LifeguardMessage lfgMsg;
     int lfgMsgID,  msgKey;
@@ -112,9 +114,10 @@ bool EnterPool(struct ClientData clientData, int chosenPool)
         exit(1);
     }
 
-    lfgMsg.mtype = chosenPool;
+    lfgMsg.mtype = enterPoolChannel;
     lfgMsg.pid = getpid();
     lfgMsg.age = clientData.age;
+    lfgMsg.is_exit = 0;
 
     printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
 
@@ -134,10 +137,10 @@ bool EnterPool(struct ClientData clientData, int chosenPool)
 
     // Wyświetlenie wyniku
     if (lfgMsg.allowed) {
-        printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), chosenPool);
+        printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), enterPoolChannel);
         return true;
     } else {
-        printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), chosenPool);
+        printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
         return false;
     }
 
