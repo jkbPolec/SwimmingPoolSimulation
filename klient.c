@@ -44,16 +44,16 @@ int main() {
         QueueRoutine();
     }
 
-    /*
+
     time_t start_time = time(NULL);
     if(pthread_create(&moniotorThread, NULL, MonitorTime, (void*)&start_time) != 0)
     {
         perror("pthread_create monitor");
         exit(1);
     }
-    */
 
-    while(!(clientData.inPool = EnterPool()))
+
+    while(!leaveFlag && !(clientData.inPool = EnterPool()))
     {
         sleep(5);
     }
@@ -64,6 +64,11 @@ int main() {
 
     }
 
+    if (clientData.inPool)
+    {
+        ExitPool();
+    }
+
 
     return 0;
 }
@@ -71,8 +76,8 @@ int main() {
 void SetUpClient() {
     srand(time(NULL) + getpid());
     //TODO dodac dziecko, zmienic zakres wieku
-    //clientData.age = rand() % 40 + 1;
-    clientData.age = 30;
+    clientData.age = rand() % 70 + 1;
+    //clientData.age = 8;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
@@ -89,7 +94,8 @@ void SetUpClient() {
     if (VIP == 1) {clientData.isVIP = true;}
     clientData.inPool = false;
     chosenPool = rand() % 3 + 1;
-
+    //TODO testy
+    chosenPool = 1;
 
 
     switch (chosenPool) {
@@ -171,8 +177,13 @@ bool EnterPool()
     lfgMsg.mtype = enterPoolChannel;
     lfgMsg.pid = getpid();
     lfgMsg.age = clientData.age;
+    if (clientData.hasKid)
+    {
+        lfgMsg.hasKid = true;
+        lfgMsg.kidAge = childData.age;
+    } else {lfgMsg.hasKid = false;}
 
-    printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
+    //printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
 
 
 
@@ -189,11 +200,12 @@ bool EnterPool()
 
 
     // Wyświetlenie wyniku
+
     if (lfgMsg.allowed) {
-        printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), enterPoolChannel);
+        //printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), enterPoolChannel);
         return true;
     } else {
-        printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
+        //printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
         return false;
     }
 
@@ -226,10 +238,10 @@ bool ExitPool() {
 
     // Wyświetlenie wyniku
     if (lfgMsg.allowed) {
-        printf("Klient PID: %d wychodzi z basenu %d!\n", getpid(), enterPoolChannel);
+        //printf("Klient PID: %d wychodzi z basenu %d!\n", getpid(), enterPoolChannel);
         return true;
     } else {
-        printf("Klient PID: %d nie wchodzi z basenu %d.\n", getpid(), enterPoolChannel);
+        //printf("Klient PID: %d nie wchodzi z basenu %d.\n", getpid(), enterPoolChannel);
         return false;
     }
 }
@@ -247,7 +259,7 @@ void *MonitorTime(void *arg) {
 
         // Sprawdzanie, czy minęło 10 sekund
         if (elapsed_time >= 5) {
-            printf("Minęło 5 sekund od startu programu!\n");
+            //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
         }
@@ -267,11 +279,8 @@ void *ChildThread(void *arg) {
 }
 
 void TimeHandler(int sig) {
-    printf("Sygnal do wyjscia!\n");
-    if (clientData.inPool)
-    {
-        ExitPool();
-    }
+    printf("Sygnal do wyjscia PID: %d!\n", getpid());
+
     leaveFlag = true;
     return;
 }

@@ -29,7 +29,7 @@ int main() {
             exit(1);
         }
         printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
-        sleep(1);
+        //sleep(1);
         // Odsyłanie klientowi wiadomosci, na jego PID
         msg.mtype = msg.pid;
 

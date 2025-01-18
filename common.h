@@ -31,7 +31,7 @@
 
 
 
-#define NUM_CLIENTS 3
+#define NUM_CLIENTS 10
 #define RECREATIONAL_POOL_SIZE          100
 #define KIDS_POOL_SIZE                  30
 #define OLYMPIC_POOL_SIZE              50

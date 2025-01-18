@@ -128,6 +128,10 @@ void SetUpIPC() {
     // Inicjalizacja danych basenu
     pool->client_count = 0;
     pool->total_age = 0;
+    for (int i = 0; i < poolSize; i++)
+    {
+        pool->pids[i] = 0;
+    }
 
     //printf("Stworzono pam dzielona dla basenu: %s\n", argv[1]);
 
@@ -158,37 +162,55 @@ void* ClientIn() {
             exit(1);
         }
 
-        printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d\n", poolChannelEnter,msg.pid, msg.age);
+        printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d, d.wiek: %d\n", poolChannelEnter,msg.pid, msg.age, msg.kidAge);
 
-        // Sprawdzanie warunków wejścia do basenu
         int new_count = pool->client_count + 1;
         int new_total_age = pool->total_age + msg.age;
+        if (msg.hasKid) {
+            new_count = new_count + 1;
+            new_total_age = new_total_age + msg.kidAge;
+        }
         int new_avg_age = (new_count > 0) ? (new_total_age / new_count) : 0;
-        bool ageFlag = true;
+        bool enterFlag = true;
+        char reason[50];
 
-        if (poolChannelEnter == OLYMPIC_ENTER_CHANNEL && msg.age < 18) {
-            ageFlag = false;
+        // Sprawdzanie warunków wejścia do basenu
+        if (poolChannelEnter == OLYMPIC_ENTER_CHANNEL && (msg.age < 18 || msg.hasKid)) {
+            enterFlag = false;
+            strcpy(reason, "nie masz 18lat na b.olimp.\n");
+        } else if (poolChannelEnter == KIDS_ENTER_CHANNEL && msg.kidAge > 5) {
+            enterFlag = false;
+            strcpy(reason, "twoje dziecko jest za duze na brodzik.\n");
+        } else if (poolChannelEnter == KIDS_ENTER_CHANNEL && msg.hasKid == false)
+        {
+            enterFlag = false;
+            strcpy(reason, "nie masz dzicka do brodzika.\n");
+        } else if (poolChannelEnter == RECREATIONAL_ENTER_CHANNEL && new_avg_age > MAX_AGE)
+        {
+            enterFlag = false;
+            strcpy(reason, "przekroczono średni wiek.\n");
+        } else if (new_count > poolSize) {
+            enterFlag = false;
+            strcpy(reason, "osiągnieto limit osób w basenie.\n");
         }
 
-        if (new_count <= poolSize && new_avg_age <= MAX_AGE && ageFlag) {
+        if (enterFlag) {
             // Klient może wejść do basenu
             pool->pids[pool->client_count] = msg.pid;
             pool->client_count++;
             pool->total_age += msg.age;
+            if (msg.hasKid){
+                pool->pids[pool->client_count] = 0;
+                pool->client_count++;
+                pool->total_age += msg.kidAge;
+            }
 
             msg.allowed = 1;
             printf("[RAT %d]Klient PID: %d wpuszczony do basenu %d.\n", poolChannelEnter,msg.pid, poolChannelEnter);
         } else {
             // Klient nie może wejść do basenu
             msg.allowed = 0;
-            printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: ", poolChannelEnter,msg.pid, poolChannelEnter);
-            if (!ageFlag) {
-                printf("nie jestes dorosly.\n");
-            } else if (new_count > poolSize) {
-                printf("osiągnięto limit osób.\n");
-            } else {
-                printf("przekroczono średni wiek.\n");
-            }
+            printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: \n%s", poolChannelEnter,msg.pid, poolChannelEnter, reason);
         }
 
         // Wysyłanie odpowiedzi do klienta
@@ -216,35 +238,36 @@ void* ClientOut() {
         client_pid = msg.pid;
         client_age = msg.age;
 
-        printf("Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", msg.pid, msg.age);
+        printf("[RAT %d]Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", poolChannelExit,msg.pid, msg.age);
 
         // Szukanie klienta w tablicy PID
         for (int i = 0; i < pool->client_count; i++) {
             if (pool->pids[i] == client_pid) {
                 found = 1;
 
+                int shift = msg.hasKid ? 2 : 1;
+
                 // Usunięcie klienta przez przesunięcie elementów w tablicy
-                for (int j = i; j < pool->client_count - 1; j++) {
-                    pool->pids[j] = pool->pids[j + 1];
+                for (int j = i; j < pool->client_count - shift; j++) {
+                    pool->pids[j] = pool->pids[j + shift];
                 }
 
                 // Aktualizacja danych basenu
-                pool->client_count--;
-                pool->total_age -= client_age;
+                pool->client_count-=shift;
+                pool->total_age -= msg.hasKid ? client_age+msg.kidAge : client_age;
 
-                printf("Klient PID: %d opuścił basen.\n", client_pid);
                 break;
             }
         }
 
         if (found) {
 
-            printf("Klient PID: %d dostal pozwolenie na opuszczenie basenu.\n", client_pid);
+            printf("[RAT %d]Klient PID: %d dostal pozwolenie na opuszczenie basenu.\n", poolChannelExit,client_pid);
             msg.allowed = 1;
         }
         else
         {
-            printf("Klient PID: %d nie został znaleziony w basenie.\n", client_pid);
+            printf("[RAT %d]Klient PID: %d nie został znaleziony w basenie.\n", poolChannelExit,client_pid);
             msg.allowed = 0;
         }
         // Wysyłanie odpowiedzi do klienta
