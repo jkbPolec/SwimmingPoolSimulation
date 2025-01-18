@@ -158,7 +158,7 @@ void* ClientIn() {
             exit(1);
         }
 
-        printf("Otrzymano zapytanie od klienta PID: %d, wiek: %d\n", msg.pid, msg.age);
+        printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d\n", poolChannelEnter,msg.pid, msg.age);
 
         // Sprawdzanie warunków wejścia do basenu
         int new_count = pool->client_count + 1;
@@ -177,11 +177,11 @@ void* ClientIn() {
             pool->total_age += msg.age;
 
             msg.allowed = 1;
-            printf("Klient PID: %d wpuszczony do basenu %d.\n", msg.pid, poolChannelEnter);
+            printf("[RAT %d]Klient PID: %d wpuszczony do basenu %d.\n", poolChannelEnter,msg.pid, poolChannelEnter);
         } else {
             // Klient nie może wejść do basenu
             msg.allowed = 0;
-            printf("Klient PID: %d nie został wpuszczony do basenu %d. Powód: ", msg.pid, poolChannelEnter);
+            printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: ", poolChannelEnter,msg.pid, poolChannelEnter);
             if (!ageFlag) {
                 printf("nie jestes dorosly.\n");
             } else if (new_count > poolSize) {
@@ -259,7 +259,7 @@ void* ClientOut() {
 
 
 void PrintPoolPids() {
-    printf("Lista PID klientów w basenie:\n");
+    printf("[RAT %d]Lista PID klientów w basenie:\n", poolChannelEnter);
     for (int i = 0; i < pool->client_count; i++) {
         printf("Klient %d: PID = %d\n", i + 1, pool->pids[i]);
     }

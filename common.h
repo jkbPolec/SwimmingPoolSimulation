@@ -28,8 +28,10 @@
 #define KIDS_POOL_CODE                  302
 #define OLYMPIC_POOL_CODE               303
 
-#define NUM_CLIENTS 1
-#define VIP_CODE    1
+
+
+
+#define NUM_CLIENTS 3
 #define RECREATIONAL_POOL_SIZE          100
 #define KIDS_POOL_SIZE                  30
 #define OLYMPIC_POOL_SIZE              50
@@ -45,6 +47,8 @@ struct LifeguardMessage {
     pid_t pid;
     int age;
     int allowed;        //1 - akcja dozwolona, 0 - zabroniona
+    bool hasKid;
+    int kidAge;
 };
 
 struct PoolStruct {
