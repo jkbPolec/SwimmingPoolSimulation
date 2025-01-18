@@ -15,6 +15,7 @@ struct ChildData {
 };
 
 void SetUpClient();
+void ChoosePool();
 void QueueRoutine();
 bool EnterPool();
 bool ExitPool();
@@ -53,21 +54,31 @@ int main() {
     }
 
 
-    while(!leaveFlag && !(clientData.inPool = EnterPool()))
-    {
-        sleep(5);
-    }
+
 
 
     while (!leaveFlag)
     {
+        ChoosePool();
 
+        while(!leaveFlag && !clientData.inPool && !(clientData.inPool = EnterPool()))
+        {
+            sleep(1);
+
+            ChoosePool();
+        }
+
+        sleep(2);
+
+        if (clientData.inPool)
+        {
+            ExitPool();
+        }
+
+        sleep(1);
     }
 
-    if (clientData.inPool)
-    {
-        ExitPool();
-    }
+
 
 
     return 0;
@@ -93,9 +104,11 @@ void SetUpClient() {
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
     clientData.inPool = false;
+}
+
+void ChoosePool() {
     chosenPool = rand() % 3 + 1;
     //TODO testy
-    chosenPool = 1;
 
 
     switch (chosenPool) {
@@ -239,15 +252,16 @@ bool ExitPool() {
     // Wyświetlenie wyniku
     if (lfgMsg.allowed) {
         //printf("Klient PID: %d wychodzi z basenu %d!\n", getpid(), enterPoolChannel);
+        clientData.inPool = false;
         return true;
     } else {
         //printf("Klient PID: %d nie wchodzi z basenu %d.\n", getpid(), enterPoolChannel);
+        clientData.inPool = true;
         return false;
     }
 }
 
 void *MonitorTime(void *arg) {
-    printf("Start watku\n");
     time_t start_time = *(time_t *)arg;  // Czas startu procesu
     time_t current_time;
     double elapsed_time;

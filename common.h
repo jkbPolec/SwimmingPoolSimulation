@@ -13,7 +13,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <stdbool.h>
-
+#include <semaphore.h>
 
 #define CASHIER_CHANNEL                 101
 

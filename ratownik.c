@@ -15,6 +15,7 @@ struct PoolStruct *pool;
 struct LifeguardMessage msg;
 pthread_t lifegaurdInThread, lifegaurdOutThread;
 
+sem_t semaphore;
 
 
 int main(int argc, char *argv[]) {
@@ -26,6 +27,8 @@ int main(int argc, char *argv[]) {
 
     SetUpLifeguard(argv[1]);
     SetUpIPC();
+
+    sem_init(&semaphore, 0 , 1);
 
     if (pthread_create(&lifegaurdInThread, NULL, ClientIn, "") != 0) {
         perror("pthread_create");
@@ -162,6 +165,8 @@ void* ClientIn() {
             exit(1);
         }
 
+        sem_wait(&semaphore);
+
         printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d, d.wiek: %d\n", poolChannelEnter,msg.pid, msg.age, msg.kidAge);
 
         int new_count = pool->client_count + 1;
@@ -213,6 +218,8 @@ void* ClientIn() {
             printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: \n%s", poolChannelEnter,msg.pid, poolChannelEnter, reason);
         }
 
+        sem_post(&semaphore);
+
         // Wysyłanie odpowiedzi do klienta
         msg.mtype = msg.pid; // Typ wiadomości odpowiada PID klienta
         if (msgsnd(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
@@ -226,7 +233,7 @@ void* ClientIn() {
 }
 void* ClientOut() {
     int client_pid, found, client_age;
-    found = 0;
+
 
     while (1) {
         // Odbieranie zapytania od klienta
@@ -234,7 +241,8 @@ void* ClientOut() {
             perror("msgrcv");
             exit(1);
         }
-
+        sem_wait(&semaphore);
+        found = 0;
         client_pid = msg.pid;
         client_age = msg.age;
 
@@ -244,6 +252,8 @@ void* ClientOut() {
         for (int i = 0; i < pool->client_count; i++) {
             if (pool->pids[i] == client_pid) {
                 found = 1;
+
+                pool->pids[i] = 0;
 
                 int shift = msg.hasKid ? 2 : 1;
 
@@ -259,6 +269,8 @@ void* ClientOut() {
                 break;
             }
         }
+
+        sem_post(&semaphore);
 
         if (found) {
 
