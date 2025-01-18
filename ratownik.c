@@ -11,7 +11,7 @@ void PrintPoolPids();
 int poolChannelEnter, poolChannelExit, poolSize;
 int shKey, shmid;
 int msgid, msgKey;
-struct PoolStruct *pool;
+struct PoolStruct pool;
 struct LifeguardMessage msg;
 pthread_t lifegaurdInThread, lifegaurdOutThread;
 
@@ -42,12 +42,13 @@ int main(int argc, char *argv[]) {
 
     printf("Wszystkie watki zakonczyly dzialanie\n");
 
-
+    /*
     // Odłączenie pamięci dzielonej
     if (shmdt(pool) == -1) {
         perror("shmdt");
         exit(1);
     }
+     */
 
     // Usuwanie pamięci dzielonej i kolejki komunikatów
     shmctl(shmid, IPC_RMID, NULL);
@@ -93,6 +94,7 @@ void SetUpLifeguard(char *code) {
 }
 void SetUpIPC() {
 
+    /*
 
     //-------------------Tworzenie pamieci dzielonej basenu
 
@@ -125,9 +127,11 @@ void SetUpIPC() {
         exit(1);
     }
 
+    */
+
     // Inicjalizacja danych basenu
-    pool->client_count = 0;
-    pool->total_age = 0;
+    pool.client_count = 0;
+    pool.total_age = 0;
 
     //printf("Stworzono pam dzielona dla basenu: %s\n", argv[1]);
 
@@ -161,8 +165,8 @@ void* ClientIn() {
         printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d\n", poolChannelEnter,msg.pid, msg.age);
 
         // Sprawdzanie warunków wejścia do basenu
-        int new_count = pool->client_count + 1;
-        int new_total_age = pool->total_age + msg.age;
+        int new_count = pool.client_count + 1;
+        int new_total_age = pool.total_age + msg.age;
         int new_avg_age = (new_count > 0) ? (new_total_age / new_count) : 0;
         bool ageFlag = true;
 
@@ -172,9 +176,9 @@ void* ClientIn() {
 
         if (new_count <= poolSize && new_avg_age <= MAX_AGE && ageFlag) {
             // Klient może wejść do basenu
-            pool->pids[pool->client_count] = msg.pid;
-            pool->client_count++;
-            pool->total_age += msg.age;
+            pool.pids[pool.client_count] = msg.pid;
+            pool.client_count++;
+            pool.total_age += msg.age;
 
             msg.allowed = 1;
             printf("[RAT %d]Klient PID: %d wpuszczony do basenu %d.\n", poolChannelEnter,msg.pid, poolChannelEnter);
@@ -219,18 +223,18 @@ void* ClientOut() {
         printf("Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", msg.pid, msg.age);
 
         // Szukanie klienta w tablicy PID
-        for (int i = 0; i < pool->client_count; i++) {
-            if (pool->pids[i] == client_pid) {
+        for (int i = 0; i < pool.client_count; i++) {
+            if (pool.pids[i] == client_pid) {
                 found = 1;
 
                 // Usunięcie klienta przez przesunięcie elementów w tablicy
-                for (int j = i; j < pool->client_count - 1; j++) {
-                    pool->pids[j] = pool->pids[j + 1];
+                for (int j = i; j < pool.client_count - 1; j++) {
+                    pool.pids[j] = pool.pids[j + 1];
                 }
 
                 // Aktualizacja danych basenu
-                pool->client_count--;
-                pool->total_age -= client_age;
+                pool.client_count--;
+                pool.total_age -= client_age;
 
                 printf("Klient PID: %d opuścił basen.\n", client_pid);
                 break;
@@ -260,7 +264,7 @@ void* ClientOut() {
 
 void PrintPoolPids() {
     printf("[RAT %d]Lista PID klientów w basenie:\n", poolChannelEnter);
-    for (int i = 0; i < pool->client_count; i++) {
-        printf("Klient %d: PID = %d\n", i + 1, pool->pids[i]);
+    for (int i = 0; i < pool.client_count; i++) {
+        printf("Klient %d: PID = %d\n", i + 1, pool.pids[i]);
     }
 }

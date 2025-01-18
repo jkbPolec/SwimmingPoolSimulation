@@ -71,8 +71,8 @@ int main() {
 void SetUpClient() {
     srand(time(NULL) + getpid());
     //TODO dodac dziecko, zmienic zakres wieku
-    clientData.age = rand() % 40 + 1;
-
+    //clientData.age = rand() % 40 + 1;
+    clientData.age = 30;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
