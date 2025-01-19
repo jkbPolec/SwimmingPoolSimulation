@@ -1,10 +1,20 @@
 #include "common.h"
 
 
+pthread_t queueThread;
+sem_t sem;
+key_t key;
+int msgid;
+struct message msg;
+
+
+void TestHandler(int);
+void *QueueThread(void *arg);
+
 int main() {
-    key_t key;
-    int msgid;
-    struct message msg;
+
+    signal(34, TestHandler);
+
 
     // Generowanie klucza do kolejki
     key = ftok("queuefile", 65);
@@ -20,14 +30,38 @@ int main() {
         exit(1);
     }
 
+    if (pthread_create(&queueThread, NULL, QueueThread, "") != 0) {
+        perror("pthread_create");
+        exit(1);
+    }
+
+    while (true)
+    {
+
+    }
+
+
+    return 0;
+}
+
+void *QueueThread(void* arg) {
+
     printf("Kasjer gotowy do odbierania wiadomości...\n");
 
     while (1) {
         // Odbieranie wiadomości od klienta
-        if (msgrcv(msgid, &msg, sizeof(msg.pid), CASHIER_CHANNEL, 0) == -1) {
-            perror("msgrcv");
-            exit(1);
+        errno = 0;
+        if(msgrcv(msgid, &msg, sizeof(msg.pid), CASHIER_CHANNEL, 0) == -1) {
+            if (errno == EINTR) {
+                printf("msgrcv przerwane przez sygnał, wznowiono...\n");
+                continue;
+            }
+            else {
+                perror("msgrcv");
+                exit(1);
+            }
         }
+
         printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
         //sleep(1);
         // Odsyłanie klientowi wiadomosci, na jego PID
@@ -41,5 +75,10 @@ int main() {
         printf("Kasjer wysłał odpowiedź do klienta o PID: %ld\n", msg.mtype);
     }
 
-    return 0;
+
+}
+
+
+void TestHandler(int sig) {
+    printf("Kasjer zglasza sie!\n");
 }

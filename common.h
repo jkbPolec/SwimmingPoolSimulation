@@ -14,6 +14,9 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <semaphore.h>
+#include <errno.h>
+#include <bits/sigaction.h>
+#include <unistd.h>
 
 #define CASHIER_CHANNEL                 101
 
@@ -28,10 +31,10 @@
 #define KIDS_POOL_CODE                  302
 #define OLYMPIC_POOL_CODE               303
 
+#define EXIT_POOL_SIGNAL 35
 
 
-
-#define NUM_CLIENTS 10
+#define NUM_CLIENTS 30
 #define RECREATIONAL_POOL_SIZE          100
 #define KIDS_POOL_SIZE                  30
 #define OLYMPIC_POOL_SIZE              50

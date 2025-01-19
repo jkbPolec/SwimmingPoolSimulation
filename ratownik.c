@@ -7,6 +7,8 @@ void SetUpIPC();
 void* ClientIn();
 void* ClientOut();
 void PrintPoolPids();
+void ClosePoolHandler(int);
+void OpenPoolHandler(int);
 
 int poolChannelEnter, poolChannelExit, poolSize;
 int shKey, shmid;
@@ -15,10 +17,13 @@ struct PoolStruct *pool;
 struct LifeguardMessage msg;
 pthread_t lifegaurdInThread, lifegaurdOutThread;
 
-sem_t semaphore;
-
+sem_t shSem, poolSem;
+bool isPoolClosed = false;
 
 int main(int argc, char *argv[]) {
+
+    signal(34, ClosePoolHandler);
+    signal(35, OpenPoolHandler);
 
     if (argc < 2) {
         printf("Zła liczba argumentów ratownika\n");
@@ -28,7 +33,8 @@ int main(int argc, char *argv[]) {
     SetUpLifeguard(argv[1]);
     SetUpIPC();
 
-    sem_init(&semaphore, 0 , 1);
+    sem_init(&shSem, 0 , 1);
+//    sem_init(&poolSem, 0, 1);
 
     if (pthread_create(&lifegaurdInThread, NULL, ClientIn, "") != 0) {
         perror("pthread_create");
@@ -43,8 +49,12 @@ int main(int argc, char *argv[]) {
     pthread_join(lifegaurdInThread, NULL);
     pthread_join(lifegaurdOutThread, NULL);
 
+
     printf("Wszystkie watki zakonczyly dzialanie\n");
 
+    // Usunięcie semaforów
+    sem_destroy(&shSem);
+//    sem_destroy(&poolSem);
 
     // Odłączenie pamięci dzielonej
     if (shmdt(pool) == -1) {
@@ -77,7 +87,7 @@ void SetUpLifeguard(char *code) {
             poolSize = KIDS_POOL_SIZE;
             poolChannelEnter = KIDS_ENTER_CHANNEL;
             poolChannelExit = KIDS_EXIT_CHANNEL;
-            printf("Stworzono ratownika b.brodzik\n");
+            printf("Stworzono ratownika b.brodzik %d\n",getpid());
             break;
         case OLYMPIC_POOL_CODE:
             poolSize = OLYMPIC_POOL_SIZE;
@@ -158,14 +168,17 @@ void SetUpIPC() {
 }
 void* ClientIn() {
 
+    int semValue;
+
     while (1) {
+
         // Odbieranie zapytania od klienta
         if (msgrcv(msgid, &msg, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelEnter, 0) == -1) {
             perror("msgrcv");
             exit(1);
         }
 
-        sem_wait(&semaphore);
+        sem_wait(&shSem);
 
         printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d, d.wiek: %d\n", poolChannelEnter,msg.pid, msg.age, msg.kidAge);
 
@@ -180,7 +193,12 @@ void* ClientIn() {
         char reason[50];
 
         // Sprawdzanie warunków wejścia do basenu
-        if (poolChannelEnter == OLYMPIC_ENTER_CHANNEL && (msg.age < 18 || msg.hasKid)) {
+        //sem_getvalue(&poolSem, &semValue);
+        if (isPoolClosed) {
+            enterFlag = false;
+            strcpy(reason, "basen jest zamkniety.\n");
+        }
+        else if (poolChannelEnter == OLYMPIC_ENTER_CHANNEL && (msg.age < 18 || msg.hasKid)) {
             enterFlag = false;
             strcpy(reason, "nie masz 18lat na b.olimp.\n");
         } else if (poolChannelEnter == KIDS_ENTER_CHANNEL && msg.kidAge > 5) {
@@ -218,7 +236,7 @@ void* ClientIn() {
             printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: \n%s", poolChannelEnter,msg.pid, poolChannelEnter, reason);
         }
 
-        sem_post(&semaphore);
+        sem_post(&shSem);
 
         // Wysyłanie odpowiedzi do klienta
         msg.mtype = msg.pid; // Typ wiadomości odpowiada PID klienta
@@ -230,7 +248,11 @@ void* ClientIn() {
         PrintPoolPids();
     }
 
+
+    printf("KONIEC WATKUKONIEC WATKUKONIEC WATKUKONIEC \n");
+
 }
+
 void* ClientOut() {
     int client_pid, found, client_age;
 
@@ -241,7 +263,7 @@ void* ClientOut() {
             perror("msgrcv");
             exit(1);
         }
-        sem_wait(&semaphore);
+        sem_wait(&shSem);
         found = 0;
         client_pid = msg.pid;
         client_age = msg.age;
@@ -270,7 +292,7 @@ void* ClientOut() {
             }
         }
 
-        sem_post(&semaphore);
+        sem_post(&shSem);
 
         if (found) {
 
@@ -290,12 +312,43 @@ void* ClientOut() {
         }
         PrintPoolPids();
     }
+
+    printf("KONIEC WATKUKONIEC WATKUKONIEC WATKUKONIEC \n");
 }
 
 
 void PrintPoolPids() {
-    printf("[RAT %d]Lista PID klientów w basenie:\n", poolChannelEnter);
+    printf("\033[4;39;49m[RAT %d]Lista PID klientów w basenie:\033[0m\n", poolChannelEnter);
     for (int i = 0; i < pool->client_count; i++) {
         printf("Klient %d: PID = %d\n", i + 1, pool->pids[i]);
     }
+}
+
+void ClosePoolHandler(int sig) {
+    printf("\033[1;31;40m-------------[RAT %d] Zamknięcie basenu-------------\033[0m\n", poolChannelEnter);
+
+//    sem_wait(&poolSem);
+    isPoolClosed = true;
+    for (int i = 0; i < pool->client_count; i++) {
+        if (pool->pids[i] != 0) {
+            kill(pool->pids[i], EXIT_POOL_SIGNAL);
+        }
+    }
+    signal(34, ClosePoolHandler);
+    signal(35, OpenPoolHandler);
+
+    printf("Zakonczono oblsuge watku zamkniecia\n");
+
+    return 0;
+}
+
+void OpenPoolHandler(int sig) {
+    printf("\033[1;32;40m-------------[RAT %d] Otwarcie basenu-------------\033[0m\n", poolChannelEnter);
+    isPoolClosed = false;
+    //sem_post(&poolSem); // Odblokowanie dostępu do basenu
+    printf("Zakonczono oblsuge watku otwarcia\n");
+
+    signal(34, ClosePoolHandler);
+    signal(35, OpenPoolHandler);
+    return 0;
 }

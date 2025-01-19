@@ -24,7 +24,7 @@ void* ChildThread(void*);
 
 void *MonitorTime(void*);
 void TimeHandler(int sig);
-
+void ExitPoolHandler(int sig);
 
 int enterPoolChannel,exitPoolChannel, chosenPool;
 int lfgMsgID,  msgKey;
@@ -37,6 +37,7 @@ bool leaveFlag = false;
 int main() {
 
     signal(34, TimeHandler);
+    signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 
     SetUpClient();
 
@@ -55,44 +56,77 @@ int main() {
 
 
 
+    /*
+    while (!leaveFlag) {
+
+        while (!clientData.inPool && !leaveFlag) {
+            ChoosePool();
+            clientData.inPool = EnterPool();
+            sleep(5);
+        }
 
 
+    }
+     */
+
+    int randomNumber;
+    int min = 500000;
+    int max = 2500000;
     while (!leaveFlag)
     {
         ChoosePool();
+        randomNumber = rand() % (max - min + 1) + min;
 
         while(!leaveFlag && !clientData.inPool && !(clientData.inPool = EnterPool()))
         {
-            sleep(1);
+            usleep(randomNumber);
 
             ChoosePool();
         }
 
-        sleep(2);
+
+
+
 
         if (clientData.inPool)
         {
+            usleep(randomNumber);
             ExitPool();
+            usleep(randomNumber);
         }
 
-        sleep(1);
+
     }
 
 
+    // Czekanie na zakończenie wątku monitora czasu
+    if (pthread_join(moniotorThread, NULL) != 0) {
+        perror("pthread_join monitor");
+    }
+
+    // Czekanie na zakończenie wątku dziecka, jeśli istnieje
+    if (clientData.hasKid) {
+        if (pthread_join(childThread, NULL) != 0) {
+            perror("pthread_join child");
+        }
+    }
 
 
-    return 0;
+    printf("Klient konczy prace\n");
+    exit(0);
 }
 
 void SetUpClient() {
     srand(time(NULL) + getpid());
     //TODO dodac dziecko, zmienic zakres wieku
     clientData.age = rand() % 70 + 1;
-    //clientData.age = 8;
+    //clientData.age = 20;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
         childData.age = rand() % 9 + 1;
+        //TODO USUNAC
+        childData.age = 3;
         if (pthread_create(&childThread, NULL, ChildThread, NULL) != 0) {
             perror("[dziecko] pthread_create");
             exit(1);
@@ -109,7 +143,7 @@ void SetUpClient() {
 void ChoosePool() {
     chosenPool = rand() % 3 + 1;
     //TODO testy
-
+    //chosenPool = 3;
 
     switch (chosenPool) {
         case 1:
@@ -201,6 +235,7 @@ bool EnterPool()
 
 
     // Wysłanie zapytania do ratownika
+    printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
     if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
         perror("msgsnd");
         exit(1);
@@ -255,8 +290,6 @@ bool ExitPool() {
         clientData.inPool = false;
         return true;
     } else {
-        //printf("Klient PID: %d nie wchodzi z basenu %d.\n", getpid(), enterPoolChannel);
-        clientData.inPool = true;
         return false;
     }
 }
@@ -270,9 +303,8 @@ void *MonitorTime(void *arg) {
     while (true) {
         current_time = time(NULL);  // Pobieramy aktualny czas w sekundach od epoki UNIX
         elapsed_time = difftime(current_time, start_time);
-
         // Sprawdzanie, czy minęło 10 sekund
-        if (elapsed_time >= 5) {
+        if (elapsed_time >= 10) {
             //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
@@ -290,11 +322,33 @@ void *MonitorTime(void *arg) {
 
 void *ChildThread(void *arg) {
     printf("Jestem dzieckiem!\n");
+
+    while (!leaveFlag) {
+    }
+    return NULL;
 }
 
 void TimeHandler(int sig) {
     printf("Sygnal do wyjscia PID: %d!\n", getpid());
 
     leaveFlag = true;
-    return;
+
+    if (clientData.inPool) {
+        printf("Probuje wyjsc z basenu, PID: %d!\n", getpid());
+        ExitPool();
+    }
+
+    signal(34, TimeHandler);
+    signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
+
+    //exit(0);
+
+}
+
+void ExitPoolHandler(int sig) {
+    printf("\033[0;31;49mMam wyjsc z wody\033[0m\n");
+    ExitPool();
+
+    signal(34, TimeHandler);
+    signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 }
