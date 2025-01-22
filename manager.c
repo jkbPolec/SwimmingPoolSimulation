@@ -3,12 +3,13 @@
 
 pid_t cashier, lifeguardRec, lifeguardKid, lifeguardOly;
 int shmid;
-struct OpenHoursStruct *hoursStruct;
+struct PoolStatus *poolStatus;
 pid_t clientPIDs[1000];
 int numberOfClients;
 struct ManagerMessage mgrMsg;
 pthread_t monitoringClients;
 
+int shID, shKey;
 
 int msgid;
 int key;
@@ -45,16 +46,39 @@ int main(int argc, char* argv[]) {
 //        kill(cashier,CASHIER_SIGNAL);
 //    }
 
+    // Generowanie klucza do pamieci dzielonej
+    shKey = ftok("poolStatus", 65);
+    if (shKey == -1) {
+        perror("ftok");
+        exit(1);
+    }
+
+    // Tworzenie pamieci dzielonej
+    shID = shmget(shKey, sizeof(struct PoolStatus), 0600 | IPC_CREAT);
+    if (shmid == -1) {
+        perror("shmget man");
+        exit(1);
+    }
+
+    // Dołączanie pamięci dzielonej
+    poolStatus = (struct PoolStatus *)shmat(shID, NULL, 0);
+    if (poolStatus == (void *)-1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    poolStatus->isOpened = true;
+
 
     // Generowanie klucza do kolejki
-     key = ftok("poolCustomers", 65);
+    key = ftok("poolCustomers", 65);
     if (key == -1) {
         perror("ftok");
         exit(1);
     }
 
     // Tworzenie kolejki komunikatów
-    msgid = msgget(key, 0666 | IPC_CREAT);
+    msgid = msgget(key, 0600 | IPC_CREAT);
     if (msgid == -1) {
         perror("msgget");
         exit(1);
@@ -86,6 +110,21 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void ClosePool() {
+    kill(cashier, CASHIER_SIGNAL);
+    kill(lifeguardRec, CLOSE_POOL_SIGNAL);
+    kill(lifeguardKid, CLOSE_POOL_SIGNAL);
+    kill(lifeguardOly, CLOSE_POOL_SIGNAL);
+
+    while (numberOfClients != 0) {
+
+    }
+
+    poolStatus->isOpened = false;
+
+
+}
+
 void *MonitorClients() {
 
     while (1) {
@@ -102,7 +141,6 @@ void *MonitorClients() {
         }
     }
 }
-
 
 void AddClient(pid_t pid) {
     clientPIDs[numberOfClients] = pid;

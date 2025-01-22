@@ -15,7 +15,6 @@
 #include <stdbool.h>
 #include <semaphore.h>
 #include <errno.h>
-#include <bits/sigaction.h>
 #include <unistd.h>
 
 #define CASHIER_CHANNEL                 101
@@ -35,6 +34,8 @@
 
 #define EXIT_POOL_SIGNAL 35
 #define CASHIER_SIGNAL 36
+#define CLOSE_POOL_SIGNAL 34
+#define OPEN_POOL_SIGNAL 35
 
 #define NUM_CLIENTS 3
 #define RECREATIONAL_POOL_SIZE          100
@@ -64,10 +65,8 @@ struct LifeguardMessage {
     int kidAge;
 };
 
-struct PoolStruct {
-    int client_count;
-    int total_age;
-    int pids[];
+struct PoolStatus {
+    bool isOpened;      //1 - basen otwarty, 0 - basen zakmniety
 };
 
 struct OpenHoursStruct {
