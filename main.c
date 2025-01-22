@@ -24,10 +24,11 @@ int main() {
     //-------------------Tworzenie menedźera
     CreateManager();
 
-    sleep(1);
+    sleep(5);
     printf("\033[1;32;40m---------------Początek pracy basenu---------------\033[0m\n");
     //-------------------Tworzenie klientow
     CreateClients();
+
 
 
     //-------------------Czekanie az wszystkie procesy sie skoncza
@@ -145,6 +146,7 @@ void terminateProcesses() {
     for (int i = 0; i < 5; ++i) {
         kill(pids[i], SIGKILL);
     }
+    system("./clean.sh");
 }
 
 

@@ -19,6 +19,7 @@ void ChoosePool();
 void QueueRoutine();
 bool EnterPool();
 bool ExitPool();
+void NotifyManager(pid_t pid, int action);
 
 void* ChildThread(void*);
 
@@ -27,7 +28,7 @@ void TimeHandler(int sig);
 void ExitPoolHandler(int sig);
 
 int enterPoolChannel,exitPoolChannel, chosenPool;
-int lfgMsgID,  msgKey;
+int lfgMsgID,  msgKey, mgrMsgID, mgrMsgKey;
 struct LifeguardMessage lfgMsg;
 struct ClientData clientData;
 struct ChildData childData;
@@ -45,6 +46,24 @@ int main() {
     if (!clientData.isVIP) {
         QueueRoutine();
     }
+
+    // Generowanie klucza do kolejki
+    mgrMsgKey = ftok("poolCustomers", 65);
+    if (mgrMsgKey == -1) {
+        perror("ftok");
+        exit(1);
+    }
+
+    // Tworzenie kolejki komunikatów
+    mgrMsgID = msgget(mgrMsgKey, 0666 | IPC_CREAT);
+    if (mgrMsgID == -1) {
+        perror("msgget");
+        exit(1);
+    }
+
+
+
+    NotifyManager(getpid(), 1);
 
 
     time_t start_time = time(NULL);
@@ -74,18 +93,16 @@ int main() {
     int max = 2500000;
     while (!leaveFlag)
     {
-        ChoosePool();
+        //ChoosePool();
         randomNumber = rand() % (max - min + 1) + min;
 
         while(!leaveFlag && !clientData.inPool && !(clientData.inPool = EnterPool()))
         {
-            usleep(randomNumber);
 
             ChoosePool();
+            usleep(randomNumber);
+
         }
-
-
-
 
 
         if (clientData.inPool)
@@ -93,34 +110,47 @@ int main() {
             usleep(randomNumber);
             ExitPool();
             usleep(randomNumber);
+            ChoosePool();
         }
 
 
     }
 
 
-    // Czekanie na zakończenie wątku monitora czasu
-    if (pthread_join(moniotorThread, NULL) != 0) {
-        perror("pthread_join monitor");
-    }
+//    // Czekanie na zakończenie wątku monitora czasu
+//    if (pthread_join(moniotorThread, NULL) != 0) {
+//        perror("pthread_join monitor");
+//    }
+//
+//    // Czekanie na zakończenie wątku dziecka, jeśli istnieje
+//    if (clientData.hasKid) {
+//        if (pthread_join(childThread, NULL) != 0) {
+//            perror("pthread_join child");
+//        }
+//    }
 
-    // Czekanie na zakończenie wątku dziecka, jeśli istnieje
-    if (clientData.hasKid) {
-        if (pthread_join(childThread, NULL) != 0) {
-            perror("pthread_join child");
-        }
-    }
-
-
+    NotifyManager(getpid(), 0);
     printf("Klient konczy prace\n");
     exit(0);
+}
+
+void NotifyManager(pid_t pid, int action) {
+    struct ManagerMessage mgrMsg;
+    mgrMsg.mtype = MANAGER_CHANNEL;
+    mgrMsg.pid = pid;
+    mgrMsg.action = action; // 1 = wejście, 0 = wyjście
+    printf("-----------------------------------------------\n");
+    if (msgsnd(mgrMsgID, &mgrMsg, sizeof(mgrMsg) - sizeof(long), 0) == -1) {
+        perror("msgsnd");
+        exit(1);
+    }
 }
 
 void SetUpClient() {
     srand(time(NULL) + getpid());
     //TODO dodac dziecko, zmienic zakres wieku
     clientData.age = rand() % 70 + 1;
-    //clientData.age = 20;
+    clientData.age = 5;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
@@ -133,7 +163,7 @@ void SetUpClient() {
         }
 
     } else { clientData.hasKid = false;}
-
+    ChoosePool();
 
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
@@ -142,7 +172,6 @@ void SetUpClient() {
 
 void ChoosePool() {
     chosenPool = rand() % 3 + 1;
-    //TODO testy
     //chosenPool = 3;
 
     switch (chosenPool) {
@@ -186,6 +215,14 @@ void QueueRoutine() {
     msg.mtype = CASHIER_CHANNEL;
     msg.pid = getpid();
 
+    if (clientData.hasKid) {
+        msg.kidAge = childData.age;
+    }
+    else
+    {
+        msg.kidAge = 99;
+    }
+
     if (msgsnd(msgid, &msg, sizeof(msg.pid), 0) == -1) {
         perror("msgsnd");
         exit(1);
@@ -194,11 +231,20 @@ void QueueRoutine() {
     msg.mtype = msg.pid;
 
     // Oczekiwanie na odpowiedź od kasjera
-    if (msgrcv(msgid, &msg, sizeof(msg.pid), msg.pid, 0) == -1) {
+    if (msgrcv(msgid, &msg, sizeof(struct message) - sizeof(long), msg.pid, 0) == -1) {
         perror("msgrcv");
         exit(1);
     }
-    printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
+
+    if (msg.allowed == 0) {
+        printf("Klient (PID: %d): Basen zamkniety, ide do domu\n", msg.pid);
+        leaveFlag = true;
+    }
+    else{
+        printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
+    }
+
+
 
 
 }

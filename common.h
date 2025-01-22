@@ -31,18 +31,28 @@
 #define KIDS_POOL_CODE                  302
 #define OLYMPIC_POOL_CODE               303
 
+#define MANAGER_CHANNEL             401
+
 #define EXIT_POOL_SIGNAL 35
+#define CASHIER_SIGNAL 36
 
-
-#define NUM_CLIENTS 30
+#define NUM_CLIENTS 3
 #define RECREATIONAL_POOL_SIZE          100
 #define KIDS_POOL_SIZE                  30
 #define OLYMPIC_POOL_SIZE              50
 #define MAX_AGE 40
 
 struct message {
-    long mtype; // Typ wiadomości (do kasjera lub klienta)
-    pid_t pid;  // PID procesu (klienta lub kasjera)
+    long mtype;         // Typ wiadomości (do kasjera lub klienta)
+    pid_t pid;          // PID procesu (klienta lub kasjera)
+    int allowed;        //1 - akcja dozwolona, 0 - zabroniona
+    int kidAge;
+};
+
+struct ManagerMessage {
+    long mtype;
+    pid_t pid;
+    int action;
 };
 
 struct LifeguardMessage {
@@ -58,5 +68,10 @@ struct PoolStruct {
     int client_count;
     int total_age;
     int pids[];
+};
+
+struct OpenHoursStruct {
+    int closingHour;  // Godzina zamknięcia (np. 18)
+    int closingMinute; // Minuta zamknięcia (np. 0)
 };
 
