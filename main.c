@@ -19,7 +19,7 @@ int main() {
     CreateCashier();
 
     //-------------------Tworzenie ratowników
-    //CreateLifeguards();
+    CreateLifeguards();
 
 
     //-------------------Tworzenie menedźera
@@ -27,14 +27,12 @@ int main() {
 
     SetupSemaphore();
 
-
+    sleep(1);
     printf("\033[1;32;40m---------------Początek pracy basenu---------------\033[0m\n");
     //-------------------Tworzenie klientow
     CreateClients();
 
 
-    sleep(2);
-    CreateLifeguards();
 
     //-------------------Czekanie az wszystkie procesy sie skoncza
     for (int i = 0; i < NUM_CLIENTS; i++) {

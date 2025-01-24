@@ -191,7 +191,7 @@ void* ClientIn() {
         pthread_mutex_lock(&mutex);
 //        sem_wait(&shSem);
 
-        printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d, d.wiek: %d\n", poolChannelEnter,msgIn.pid, msgIn.age, msgIn.kidAge);
+//        printf("[RAT %d]Otrzymano zapytanie od klienta PID: %d, wiek: %d, d.wiek: %d\n", poolChannelEnter,msgIn.pid, msgIn.age, msgIn.kidAge);
 
         int new_count = pool->client_count + 1;
         int new_total_age = pool->total_age + msgIn.age;
@@ -249,14 +249,14 @@ void* ClientIn() {
         }
 
 
-        printf("Przed wyslaniem wiadomosci do %d\n", msgIn.pid);
+//        printf("Przed wyslaniem wiadomosci do %d\n", msgIn.pid);
         // Wysyłanie odpowiedzi do klienta
         msgIn.mtype = msgIn.pid; // Typ wiadomości odpowiada PID klienta
         if (msgsnd(msgid, &msgIn, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
             perror("msgsnd");
             exit(1);
         }
-        printf("Wysłano wiadomosc do: %ld\n", msgIn.mtype);
+//        printf("Wysłano wiadomosc do: %ld\n", msgIn.mtype);
 
         pthread_mutex_unlock(&mutex);
 //        PrintPoolPids();
@@ -278,14 +278,14 @@ void* ClientOut() {
             perror("msgrcv");
             exit(1);
         }
-        printf("[RAT %d]Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", poolChannelExit,msgOut.pid, msgOut.age);
+//        printf("[RAT %d]Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", poolChannelExit,msgOut.pid, msgOut.age);
 //        sem_wait(&shSem);
 
         found = 0;
         client_pid = msgOut.pid;
         client_age = msgOut.age;
         pthread_mutex_lock(&mutex);
-        printf("[RAT %d]Sekcja sem, wyjscie %d\n", poolChannelExit,msgOut.pid);
+//        printf("[RAT %d]Sekcja sem, wyjscie %d\n", poolChannelExit,msgOut.pid);
 
         // Szukanie klienta w tablicy PID
         for (int i = 0; i < pool->client_count; i++) {
@@ -322,14 +322,14 @@ void* ClientOut() {
             msgOut.allowed = 0;
         }
 
-        printf("Przed wyslaniem wiadomosci do %d\n", msgOut.pid);
+//        printf("Przed wyslaniem wiadomosci do %d\n", msgOut.pid);
         // Wysyłanie odpowiedzi do klienta
         msgOut.mtype = msgOut.pid; // Typ wiadomości odpowiada PID klienta
         if (msgsnd(msgid, &msgOut, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
             perror("msgsnd");
             exit(1);
         }
-        printf("Wysłano wiadomosc do: %ld\n", msgOut.mtype);
+//        printf("Wysłano wiadomosc do: %ld\n", msgOut.mtype);
         pthread_mutex_unlock(&mutex);
 //        sem_post(&shSem);
 

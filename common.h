@@ -41,7 +41,7 @@
 #define CLOSE_POOL_SIGNAL 34
 #define OPEN_POOL_SIGNAL 35
 
-#define NUM_CLIENTS 700
+#define NUM_CLIENTS 100
 #define RECREATIONAL_POOL_SIZE          10
 #define KIDS_POOL_SIZE                  10
 #define OLYMPIC_POOL_SIZE              10

@@ -56,12 +56,13 @@ int main(int argc, char* argv[]) {
 //    kill(lifeguardKid, OPEN_POOL_SIGNAL);
 //    kill(lifeguardOly, OPEN_POOL_SIGNAL);
 //
-//    int result = system("killall -s 34 klient");
-//    if (result == -1) {
-//        perror("system");
-//    } else {
-//        printf("Wysłano sygnał 34 do wszystkich procesów 'klient'.\n");
-//    }
+    sleep(3);
+    int result = system("killall -s 34 klient");
+    if (result == -1) {
+        perror("system");
+    } else {
+        printf("Wysłano sygnał 34 do wszystkich procesów 'klient'.\n");
+    }
 
 
     while (CheckSemaphoreValue() != 0) {

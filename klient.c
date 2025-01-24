@@ -59,6 +59,7 @@ int main() {
 
 
 
+
     time_t start_time = time(NULL);
     if(pthread_create(&moniotorThread, NULL, MonitorTime, (void*)&start_time) != 0)
     {
@@ -67,21 +68,23 @@ int main() {
     }
 
 
-    ChoosePool();
-    pthread_create(&msgThread, NULL, EnterPool, "");
-    //pthread_join(msgThread, NULL);
+//    ChoosePool();
+//    pthread_create(&msgThread, NULL, EnterPool, "");
+//    pthread_join(msgThread, NULL);
 
 
     while (!leaveFlag) {
 
-//        while (!clientData.inPool && !leaveFlag) {
-
-//        }
+        while (!clientData.inPool && !leaveFlag) {
+                ChoosePool();
+                pthread_create(&msgThread, NULL, EnterPool, "");
+                pthread_join(msgThread, NULL);
+        }
     }
-    printf("Klient %d Checkpoint\n", getpid());
+//    printf("Klient %d Checkpoint\n", getpid());
 
     pthread_join(msgThread, NULL);
-    printf("Watek joined %d \n", getpid());
+//    printf("Watek joined %d \n", getpid());
     if (clientData.inPool)
     {
         ExitPool();
@@ -156,7 +159,9 @@ void SemaphoreAction(int action) {
         perror("semctl getval");
         exit(5);
     }
-    printf("[KLI %d][%d]Aktualna wartość semafora: %d\n", getpid(), action,semValue);
+    if (semValue%10 == 0) {
+        printf("[KLI %d][%d]Aktualna wartość semafora: %d\n", getpid(), action,semValue);
+    }
 
     //printf("Klient PID %d zwiększył wartość semafora.\n", getpid());
 }
@@ -214,11 +219,26 @@ void *QueueRoutine(void* arg) {
         msg.kidAge = 99;
     }
 
+
+    struct msqid_ds queueInfo;
+
+    while (1) {
+        if (msgctl(msgid, IPC_STAT, &queueInfo) == -1) {
+            perror("msgctl");
+            exit(18);
+        }
+
+        if (queueInfo.msg_qnum < MAX_CLIENT_MSG)
+        {
+            break;
+        }
+    }
+
     if (msgsnd(msgid, &msg, sizeof(msg.pid), 0) == -1) {
         perror("msgsnd");
         exit(9);
     }
-    printf("Klient (PID: %d) wysłał swój PID do kasjera.\n", msg.pid);
+//    printf("Klient (PID: %d) wysłał swój PID do kasjera.\n", msg.pid);
     msg.mtype = msg.pid;
 
     // Oczekiwanie na odpowiedź od kasjera
@@ -286,14 +306,14 @@ void *EnterPool(void* arg)
         }
 
         // Wysłanie zapytania do ratownika
-        printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
+//        printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
         if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
             perror("msgsnd");
             exit(13);
         }
 
         while (1) {
-            printf("Proba wejscia na basen %d\n", getpid());
+//            printf("Proba wejscia na basen %d\n", getpid());
             if (msgrcv(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), getpid(), 0) == -1) {
                 if (errno == EINTR) {
                     printf("Przerwanie msgrcv\n");
@@ -307,7 +327,7 @@ void *EnterPool(void* arg)
             break;
         }
 
-        printf("Odebrana wiadomosc %d\n", getpid());
+//        printf("Odebrana wiadomosc %d\n", getpid());
 
 
         // Wyświetlenie wyniku
@@ -321,7 +341,7 @@ void *EnterPool(void* arg)
         }
 
         if (leaveFlag) {
-            printf("Ostatni enter pool %d\n", getpid());
+//            printf("Ostatni enter pool %d\n", getpid());
         }
 
     return;
@@ -333,7 +353,7 @@ void ExitPool() {
 
     pthread_create(&testExitThread, NULL, ExitPoolThread, "");
     pthread_join(testExitThread, NULL);
-    printf("Klient %d Checkpoint 2\n", getpid());
+//    printf("Klient %d Checkpoint 2\n", getpid());
 
 }
 
@@ -369,7 +389,7 @@ void *ExitPoolThread(void* arg) {
     }
 
     while (1) {
-        printf("Proba wyjscia z basenu %d\n", getpid());
+//        printf("Proba wyjscia z basenu %d\n", getpid());
         if (msgrcv(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), getpid(), 0) == -1) {
             if (errno == EINTR) {
                 printf("Przerwanie msgrcv\n");
@@ -391,7 +411,7 @@ void *ExitPoolThread(void* arg) {
     }
     leaveReqSent = false;
 
-    printf("Ostatni exit pool %d\n", getpid());
+//    printf("Ostatni exit pool %d\n", getpid());
 }
 
 void *MonitorTime(void *arg) {
@@ -404,7 +424,7 @@ void *MonitorTime(void *arg) {
         current_time = time(NULL);  // Pobieramy aktualny czas w sekundach od epoki UNIX
         elapsed_time = difftime(current_time, start_time);
         // Sprawdzanie, czy minęło 10 sekund
-        if (elapsed_time >= 1 && leaveFlag == false) {
+        if (elapsed_time >= 5 && leaveFlag == false) {
             //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
