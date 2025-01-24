@@ -65,7 +65,7 @@ void *QueueThread(void* arg) {
             }
         }
 
-        printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
+        //printf("Kasjer odebrał PID klienta: %d\n", msg.pid);
         //sleep(1);
         // Odsyłanie klientowi wiadomosci, na jego PID
         msg.mtype = msg.pid;
@@ -86,10 +86,10 @@ void *QueueThread(void* arg) {
             perror("msgsnd");
             exit(1);
         }
-        printf("Kasjer wysłał odpowiedź do klienta o PID: %ld\n", msg.mtype);
+        //printf("Kasjer wysłał odpowiedź do klienta o PID: %ld\n", msg.mtype);
 
         if (msg.kidAge < 10 && msg.allowed == 1) {
-            printf("Dziecko nie placi za wejscie, klient o PID: %ld\n", msg.mtype);
+            //printf("Dziecko nie placi za wejscie, klient o PID: %ld\n", msg.mtype);
         }
     }
 

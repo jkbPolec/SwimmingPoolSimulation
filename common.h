@@ -17,6 +17,10 @@
 #include <errno.h>
 #include <unistd.h>
 
+#define SEM_KEY 47382
+
+#define MAX_CLIENT_MSG 500
+
 #define CASHIER_CHANNEL                 101
 
 #define RECREATIONAL_ENTER_CHANNEL  211
@@ -37,10 +41,10 @@
 #define CLOSE_POOL_SIGNAL 34
 #define OPEN_POOL_SIGNAL 35
 
-#define NUM_CLIENTS 3
-#define RECREATIONAL_POOL_SIZE          100
-#define KIDS_POOL_SIZE                  30
-#define OLYMPIC_POOL_SIZE              50
+#define NUM_CLIENTS 700
+#define RECREATIONAL_POOL_SIZE          10
+#define KIDS_POOL_SIZE                  10
+#define OLYMPIC_POOL_SIZE              10
 #define MAX_AGE 40
 
 struct message {
@@ -48,12 +52,6 @@ struct message {
     pid_t pid;          // PID procesu (klienta lub kasjera)
     int allowed;        //1 - akcja dozwolona, 0 - zabroniona
     int kidAge;
-};
-
-struct ManagerMessage {
-    long mtype;
-    pid_t pid;
-    int action;
 };
 
 struct LifeguardMessage {
@@ -65,6 +63,13 @@ struct LifeguardMessage {
     int kidAge;
 };
 
+
+struct PoolStruct {
+    int client_count;
+    int total_age;
+    int pids[];
+    };
+
 struct PoolStatus {
     bool isOpened;      //1 - basen otwarty, 0 - basen zakmniety
 };
@@ -73,4 +78,7 @@ struct OpenHoursStruct {
     int closingHour;  // Godzina zamknięcia (np. 18)
     int closingMinute; // Minuta zamknięcia (np. 0)
 };
+
+
+
 

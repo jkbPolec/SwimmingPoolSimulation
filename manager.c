@@ -5,20 +5,16 @@ pid_t cashier, lifeguardRec, lifeguardKid, lifeguardOly;
 int shmid;
 struct PoolStatus *poolStatus;
 pid_t clientPIDs[1000];
-int numberOfClients;
-struct ManagerMessage mgrMsg;
-pthread_t monitoringClients;
+
+
 
 int shID, shKey;
+int semID;
 
-int msgid;
-int key;
-
-void SetupSharedMemory();
+void SetupMemory();
 void SetClosingTime();
-void AddClient(pid_t pid);
-void RemoveClient(pid_t pid);
-void *MonitorClients();
+void SetupSemaphore();
+int CheckSemaphoreValue();
 
 int main(int argc, char* argv[]) {
 
@@ -27,11 +23,13 @@ int main(int argc, char* argv[]) {
         fprintf(stderr,"Niepoprawna liczba argumentow!\n");
         exit(1);
     }
-
     cashier = (pid_t)atoi(argv[1]);
     lifeguardRec = (pid_t)atoi(argv[2]);
     lifeguardKid = (pid_t)atoi(argv[3]);
     lifeguardOly = (pid_t)atoi(argv[4]);
+
+    SetupMemory();
+    SetupSemaphore();
 
     int randomPid;
 //    while (true) {
@@ -46,6 +44,89 @@ int main(int argc, char* argv[]) {
 //        kill(cashier,CASHIER_SIGNAL);
 //    }
 
+
+//    sleep(2);
+//    poolStatus->isOpened = false;
+//    kill(cashier, CASHIER_SIGNAL);
+//    kill(lifeguardRec, CLOSE_POOL_SIGNAL);
+//    kill(lifeguardKid, CLOSE_POOL_SIGNAL);
+//    kill(lifeguardOly, CLOSE_POOL_SIGNAL);
+
+//    kill(lifeguardRec, OPEN_POOL_SIGNAL);
+//    kill(lifeguardKid, OPEN_POOL_SIGNAL);
+//    kill(lifeguardOly, OPEN_POOL_SIGNAL);
+//
+//    int result = system("killall -s 34 klient");
+//    if (result == -1) {
+//        perror("system");
+//    } else {
+//        printf("Wysłano sygnał 34 do wszystkich procesów 'klient'.\n");
+//    }
+
+
+    while (CheckSemaphoreValue() != 0) {
+
+    }
+
+    printf("Wszyscy wyszli\n");
+    CheckSemaphoreValue();
+    CheckSemaphoreValue();
+    CheckSemaphoreValue();
+
+
+    while (true) {
+
+    }
+
+//    sleep(5);
+//    kill(cashier, 34);
+//    kill(lifeguardRec, 34);
+//    kill(lifeguardKid, 34);
+//    kill(lifeguardOly, 34);
+
+//    sleep(10);
+
+
+//    kill(lifeguardOly, 35);
+
+//    kill(lifeguardOly, 34);
+    return 0;
+}
+
+    //Funkcja tworzy semafor, potrzebny do monitorowania ilosci klientow na basenie
+void SetupSemaphore() {
+
+    // Tworzenie semafora
+    semID = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
+    if (semID == -1) {
+        perror("semget");
+        exit(1);
+    }
+
+    // Inicjalizacja semafora na 0
+    if (semctl(semID, 0, SETVAL, 0) == -1) {
+        perror("semctl");
+        exit(1);
+    }
+
+    printf("Semafor utworzony i zainicjalizowany na 0.\n");
+}
+
+    //Funkcja sprawdza, ile klientow jest na basenie
+int CheckSemaphoreValue() {
+    int semValue = semctl(semID, 0, GETVAL);
+    if (semValue == -1) {
+        perror("semctl getval");
+        exit(1);
+    }
+    //printf("[MAN]Aktualna wartość semafora: %d\n", semValue);
+    return semValue;
+}
+
+
+    //Funkcja tworzy pamiec dzielona, klienci beda sprawdzac
+    //czy basen jest otwarty czy zamkniety
+void SetupMemory() {
     // Generowanie klucza do pamieci dzielonej
     shKey = ftok("poolStatus", 65);
     if (shKey == -1) {
@@ -68,99 +149,15 @@ int main(int argc, char* argv[]) {
     }
 
     poolStatus->isOpened = true;
+}
 
 
-    // Generowanie klucza do kolejki
-    key = ftok("poolCustomers", 65);
-    if (key == -1) {
-        perror("ftok");
+// Funkcja czyszcząca semafor
+void CleanupSemaphore() {
+    if (semctl(semID, 0, IPC_RMID) == -1) {
+        perror("semctl remove");
         exit(1);
     }
-
-    // Tworzenie kolejki komunikatów
-    msgid = msgget(key, 0600 | IPC_CREAT);
-    if (msgid == -1) {
-        perror("msgget");
-        exit(1);
-    }
-
-    if(pthread_create(&monitoringClients, NULL, MonitorClients, "") != 0) {
-        perror("pthread_create");
-        exit(1);
-    }
-
-    while (true) {
-
-    }
-
-
-
-//    sleep(5);
-//    kill(cashier, 34);
-//    kill(lifeguardRec, 34);
-//    kill(lifeguardKid, 34);
-//    kill(lifeguardOly, 34);
-
-//    sleep(10);
-
-
-//    kill(lifeguardOly, 35);
-
-//    kill(lifeguardOly, 34);
-    return 0;
-}
-
-void ClosePool() {
-    kill(cashier, CASHIER_SIGNAL);
-    kill(lifeguardRec, CLOSE_POOL_SIGNAL);
-    kill(lifeguardKid, CLOSE_POOL_SIGNAL);
-    kill(lifeguardOly, CLOSE_POOL_SIGNAL);
-
-    while (numberOfClients != 0) {
-
-    }
-
-    poolStatus->isOpened = false;
-
-
-}
-
-void *MonitorClients() {
-
-    while (1) {
-        if (msgrcv(msgid, &mgrMsg, sizeof(mgrMsg) - sizeof(long), MANAGER_CHANNEL, 0) == -1) {
-            if (errno == EINTR) continue; // Przerwanie przez sygnał
-            perror("msgrcv");
-            exit(1);
-        }
-
-        if (mgrMsg.action == 1) {
-            AddClient(mgrMsg.pid); // Dodaj klienta
-        } else if (mgrMsg.action == 0) {
-            RemoveClient(mgrMsg.pid); // Usuń klienta
-        }
-    }
-}
-
-void AddClient(pid_t pid) {
-    clientPIDs[numberOfClients] = pid;
-    numberOfClients ++;
-    printf("Dodano klienta PID %d. Liczba klientów: %d\n", pid, numberOfClients);
-}
-
-void RemoveClient(pid_t pid) {
-    for (int i = 0; i < numberOfClients; i++) {
-        if (clientPIDs[i] == pid) {
-            // Przesunięcie elementów w tablicy, aby wypełnić lukę
-            for (int j = i; j < numberOfClients - 1; j++) {
-                clientPIDs[j] = clientPIDs[j + 1];
-            }
-            numberOfClients--;
-            printf("Usunięto klienta PID %d. Liczba klientów: %d\n", pid, numberOfClients);
-            return;
-        }
-    }
-    printf("Nie znaleziono klienta PID %d na liście.\n", pid);
-
+    printf("Semafor usunięty.\n");
 }
 

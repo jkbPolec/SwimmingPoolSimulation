@@ -1,5 +1,6 @@
 #include "common.h"
 
+void SetupSemaphore();
 void CreateCashier();
 void CreateClients();
 void CreateLifeguards();
@@ -9,27 +10,31 @@ void sigintHandler(int sig);
 void terminateProcesses();
 
 int pids[5];
+int semID;
 
 int main() {
     signal(SIGINT, sigintHandler);
-
 
     //-------------------Tworzenie kasjera
     CreateCashier();
 
     //-------------------Tworzenie ratowników
-    CreateLifeguards();
+    //CreateLifeguards();
 
 
     //-------------------Tworzenie menedźera
     CreateManager();
 
-    sleep(5);
+    SetupSemaphore();
+
+
     printf("\033[1;32;40m---------------Początek pracy basenu---------------\033[0m\n");
     //-------------------Tworzenie klientow
     CreateClients();
 
 
+    sleep(2);
+    CreateLifeguards();
 
     //-------------------Czekanie az wszystkie procesy sie skoncza
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -38,7 +43,10 @@ int main() {
 
         if (pid > 0) {
             if (WIFEXITED(status)) {
-                printf("Proces o PID %d zakończył się z kodem wyjścia %d.\n", pid, WEXITSTATUS(status));
+                if (WEXITSTATUS(status) != 0)
+                {
+                    printf("Proces o PID %d zakończył się z kodem wyjścia %d.\n", pid, WEXITSTATUS(status));
+                }
             } else if (WIFSIGNALED(status)) {
                 printf("Proces o PID %d zakończył się sygnałem %d.\n", pid, WTERMSIG(status));
             } else {
@@ -49,11 +57,35 @@ int main() {
         }
     }
 
+    while (true) {
+
+    }
+
     terminateProcesses();
 
 
     return 0;
 }
+
+
+void SetupSemaphore() {
+
+    // Tworzenie semafora
+    semID = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
+    if (semID == -1) {
+        perror("semget");
+        exit(1);
+    }
+
+    // Inicjalizacja semafora na 0
+    if (semctl(semID, 0, SETVAL, 0) == -1) {
+        perror("semctl");
+        exit(1);
+    }
+
+    printf("Semafor utworzony i zainicjalizowany na 0.\n");
+}
+
 
 void CreateCashier() {
     pid_t pid = fork();

@@ -16,24 +16,30 @@ struct ChildData {
 
 void SetUpClient();
 void ChoosePool();
-void QueueRoutine();
-bool EnterPool();
-bool ExitPool();
-void NotifyManager(pid_t pid, int action);
+void *QueueRoutine(void*);
+void *EnterPool(void*);
+void ExitPool();
+void SemaphoreAction(int action);
+
+
 
 void* ChildThread(void*);
-
-void *MonitorTime(void*);
+void* MonitorTime(void*);
+void *ExitPoolThread(void* arg);
 void TimeHandler(int sig);
 void ExitPoolHandler(int sig);
 
-int enterPoolChannel,exitPoolChannel, chosenPool;
-int lfgMsgID,  msgKey, mgrMsgID, mgrMsgKey;
-struct LifeguardMessage lfgMsg;
+
 struct ClientData clientData;
 struct ChildData childData;
-pthread_t moniotorThread, childThread;
+pthread_t moniotorThread, childThread, msgThread, testExitThread;
 bool leaveFlag = false;
+bool leaveReqSent = false;
+
+int enterPoolChannel,exitPoolChannel, chosenPool;
+int lfgMsgID,  msgKey, semID;
+struct LifeguardMessage lfgMsg;
+
 
 int main() {
 
@@ -44,76 +50,41 @@ int main() {
 
 
     if (!clientData.isVIP) {
-        QueueRoutine();
+
+        pthread_create(&msgThread, NULL, QueueRoutine, "");
+        pthread_join(msgThread, NULL);
     }
 
-    // Generowanie klucza do kolejki
-    mgrMsgKey = ftok("poolCustomers", 65);
-    if (mgrMsgKey == -1) {
-        perror("ftok");
-        exit(1);
-    }
+    SemaphoreAction(1);
 
-    // Tworzenie kolejki komunikatów
-    mgrMsgID = msgget(mgrMsgKey, 0666 | IPC_CREAT);
-    if (mgrMsgID == -1) {
-        perror("msgget");
-        exit(1);
-    }
-
-
-
-    NotifyManager(getpid(), 1);
 
 
     time_t start_time = time(NULL);
     if(pthread_create(&moniotorThread, NULL, MonitorTime, (void*)&start_time) != 0)
     {
         perror("pthread_create monitor");
-        exit(1);
+        exit(17);
     }
 
 
+    ChoosePool();
+    pthread_create(&msgThread, NULL, EnterPool, "");
+    //pthread_join(msgThread, NULL);
 
-    /*
+
     while (!leaveFlag) {
 
-        while (!clientData.inPool && !leaveFlag) {
-            ChoosePool();
-            clientData.inPool = EnterPool();
-            sleep(5);
-        }
+//        while (!clientData.inPool && !leaveFlag) {
 
-
+//        }
     }
-     */
+    printf("Klient %d Checkpoint\n", getpid());
 
-    int randomNumber;
-    int min = 500000;
-    int max = 2500000;
-    while (!leaveFlag)
+    pthread_join(msgThread, NULL);
+    printf("Watek joined %d \n", getpid());
+    if (clientData.inPool)
     {
-        //ChoosePool();
-        randomNumber = rand() % (max - min + 1) + min;
-
-        while(!leaveFlag && !clientData.inPool && !(clientData.inPool = EnterPool()))
-        {
-
-            ChoosePool();
-            usleep(randomNumber);
-
-        }
-
-
-        if (clientData.inPool)
-        {
-            usleep(randomNumber);
-            ExitPool();
-            usleep(randomNumber);
-            ChoosePool();
-        }
-
-
+        ExitPool();
     }
 
 
@@ -129,28 +100,27 @@ int main() {
 //        }
 //    }
 
-    NotifyManager(getpid(), 0);
-    printf("Klient konczy prace\n");
+//    printf("Klient %d konczy prace\n", getpid());
+    SemaphoreAction(-1);
     exit(0);
 }
 
-void NotifyManager(pid_t pid, int action) {
-    struct ManagerMessage mgrMsg;
-    mgrMsg.mtype = MANAGER_CHANNEL;
-    mgrMsg.pid = pid;
-    mgrMsg.action = action; // 1 = wejście, 0 = wyjście
-    printf("-----------------------------------------------\n");
-    if (msgsnd(mgrMsgID, &mgrMsg, sizeof(mgrMsg) - sizeof(long), 0) == -1) {
-        perror("msgsnd");
-        exit(1);
-    }
-}
+
 
 void SetUpClient() {
+
+    // Łączenie się z istniejącym semaforem
+    semID = semget(SEM_KEY, 1, 0666);
+    if (semID == -1) {
+        perror("semget");
+        exit(2);
+    }
+
+
     srand(time(NULL) + getpid());
     //TODO dodac dziecko, zmienic zakres wieku
     clientData.age = rand() % 70 + 1;
-    clientData.age = 5;
+    //clientData.age = 5;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
@@ -159,7 +129,7 @@ void SetUpClient() {
         childData.age = 3;
         if (pthread_create(&childThread, NULL, ChildThread, NULL) != 0) {
             perror("[dziecko] pthread_create");
-            exit(1);
+            exit(3);
         }
 
     } else { clientData.hasKid = false;}
@@ -168,6 +138,27 @@ void SetUpClient() {
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
     clientData.inPool = false;
+}
+
+void SemaphoreAction(int action) {
+    struct sembuf op;
+    op.sem_num = 0;
+    op.sem_op = action;  // Operacja zwiększenia/zmniejszenia o 1
+    op.sem_flg = 0;
+
+    if (semop(semID, &op, 1) == -1) {
+        perror("semop");
+        exit(4);
+    }
+
+    int semValue = semctl(semID, 0, GETVAL);
+    if (semValue == -1) {
+        perror("semctl getval");
+        exit(5);
+    }
+    printf("[KLI %d][%d]Aktualna wartość semafora: %d\n", getpid(), action,semValue);
+
+    //printf("Klient PID %d zwiększył wartość semafora.\n", getpid());
 }
 
 void ChoosePool() {
@@ -189,11 +180,11 @@ void ChoosePool() {
             break;
         default:
             fprintf(stderr,"Pool like this, doesnt exist\n");
-            exit(1);
+            exit(6);
     }
 }
 
-void QueueRoutine() {
+void *QueueRoutine(void* arg) {
     int key, msgid;
     struct message msg;
 
@@ -201,14 +192,14 @@ void QueueRoutine() {
     key = ftok("queuefile", 65);
     if (key == -1) {
         perror("ftok");
-        exit(1);
+        exit(7);
     }
 
     // Otwieranie kolejki komunikatów
     msgid = msgget(key, 0666);
     if (msgid == -1) {
         perror("msgget");
-        exit(1);
+        exit(8);
     }
 
     // Wysyłanie komunikatu z PID-em klienta do kasjera
@@ -225,7 +216,7 @@ void QueueRoutine() {
 
     if (msgsnd(msgid, &msg, sizeof(msg.pid), 0) == -1) {
         perror("msgsnd");
-        exit(1);
+        exit(9);
     }
     printf("Klient (PID: %d) wysłał swój PID do kasjera.\n", msg.pid);
     msg.mtype = msg.pid;
@@ -233,7 +224,7 @@ void QueueRoutine() {
     // Oczekiwanie na odpowiedź od kasjera
     if (msgrcv(msgid, &msg, sizeof(struct message) - sizeof(long), msg.pid, 0) == -1) {
         perror("msgrcv");
-        exit(1);
+        exit(10);
     }
 
     if (msg.allowed == 0) {
@@ -244,89 +235,152 @@ void QueueRoutine() {
         printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
     }
 
-
+    return;
 
 
 }
 
-bool EnterPool()
+void *EnterPool(void* arg)
 {
-    if (lfgMsgID == 0)
-    {
-        //-------------------Tworzenie kolejki komunikatow do basenu
-        msgKey = ftok("queuefile", 65);
-        if (msgKey == -1) {
-            perror("ftok");
-            exit(1);
+
+
+        if (lfgMsgID == 0) {
+            //-------------------Tworzenie kolejki komunikatow do basenu
+            msgKey = ftok("queuefile", 65);
+            if (msgKey == -1) {
+                perror("ftok");
+                exit(11);
+            }
+
+            lfgMsgID = msgget(msgKey, 0600);
+            if (lfgMsgID == -1) {
+                perror("msgget");
+                exit(12);
+            }
         }
 
-        lfgMsgID = msgget(msgKey, 0600);
-        if (lfgMsgID == -1) {
-            perror("msgget");
-            exit(1);
+        lfgMsg.mtype = enterPoolChannel;
+        lfgMsg.pid = getpid();
+        lfgMsg.age = clientData.age;
+        if (clientData.hasKid) {
+            lfgMsg.hasKid = true;
+            lfgMsg.kidAge = childData.age;
+        } else { lfgMsg.hasKid = false; }
+
+        //printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
+
+
+
+        struct msqid_ds queueInfo;
+
+        while (1) {
+            if (msgctl(lfgMsgID, IPC_STAT, &queueInfo) == -1) {
+                perror("msgctl");
+                exit(18);
+            }
+
+            if (queueInfo.msg_qnum < MAX_CLIENT_MSG)
+            {
+                break;
+            }
         }
-    }
 
-    lfgMsg.mtype = enterPoolChannel;
-    lfgMsg.pid = getpid();
-    lfgMsg.age = clientData.age;
-    if (clientData.hasKid)
-    {
-        lfgMsg.hasKid = true;
-        lfgMsg.kidAge = childData.age;
-    } else {lfgMsg.hasKid = false;}
+        // Wysłanie zapytania do ratownika
+        printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
+        if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
+            perror("msgsnd");
+            exit(13);
+        }
 
-    //printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
+        while (1) {
+            printf("Proba wejscia na basen %d\n", getpid());
+            if (msgrcv(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), getpid(), 0) == -1) {
+                if (errno == EINTR) {
+                    printf("Przerwanie msgrcv\n");
+                    continue;
 
+                } else {
+                    perror("msgrcv");
+                    exit(14);
+                }
+            }
+            break;
+        }
 
-
-    // Wysłanie zapytania do ratownika
-    printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
-    if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
-        perror("msgsnd");
-        exit(1);
-    }
-
-    if (msgrcv(lfgMsgID, &lfgMsg, sizeof (struct  LifeguardMessage) - sizeof (long), getpid(), 0) == -1) {
-        perror("msgrcv");
-        exit(1);
-    }
+        printf("Odebrana wiadomosc %d\n", getpid());
 
 
-    // Wyświetlenie wyniku
+        // Wyświetlenie wyniku
 
-    if (lfgMsg.allowed) {
-        //printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), enterPoolChannel);
-        return true;
-    } else {
-        //printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
-        return false;
-    }
+        if (lfgMsg.allowed) {
+            //printf("Klient PID: %d wchodzi na basen %d!\n", getpid(), enterPoolChannel);
+            clientData.inPool = true;
+        } else {
+            //printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
+            clientData.inPool = false;
+        }
+
+        if (leaveFlag) {
+            printf("Ostatni enter pool %d\n", getpid());
+        }
+
+    return;
+}
+
+void ExitPool() {
 
 
 
+    pthread_create(&testExitThread, NULL, ExitPoolThread, "");
+    pthread_join(testExitThread, NULL);
+    printf("Klient %d Checkpoint 2\n", getpid());
 
 }
 
-bool ExitPool() {
+void *ExitPoolThread(void* arg) {
+    leaveReqSent = true;
+
 
     lfgMsg.mtype = exitPoolChannel;
     lfgMsg.pid = getpid();
     lfgMsg.age = clientData.age;
 
-    printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
+//    printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
 
 
+    struct msqid_ds queueInfo;
+
+    while (1) {
+        if (msgctl(lfgMsgID, IPC_STAT, &queueInfo) == -1) {
+            perror("msgctl");
+            exit(18);
+        }
+
+        if (queueInfo.msg_qnum < MAX_CLIENT_MSG)
+        {
+            break;
+        }
+    }
 
     // Wysłanie zapytania do ratownika
     if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
         perror("msgsnd");
-        exit(1);
+        exit(15);
     }
 
-    if (msgrcv(lfgMsgID, &lfgMsg, sizeof (struct  LifeguardMessage) - sizeof (long), getpid(), 0) == -1) {
-        perror("msgrcv");
-        exit(1);
+    while (1) {
+        printf("Proba wyjscia z basenu %d\n", getpid());
+        if (msgrcv(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), getpid(), 0) == -1) {
+            if (errno == EINTR) {
+                printf("Przerwanie msgrcv\n");
+                continue;
+
+            } else {
+                perror("msgrcv");
+                exit(16);
+            }
+        }
+        break;
     }
 
 
@@ -334,10 +388,10 @@ bool ExitPool() {
     if (lfgMsg.allowed) {
         //printf("Klient PID: %d wychodzi z basenu %d!\n", getpid(), enterPoolChannel);
         clientData.inPool = false;
-        return true;
-    } else {
-        return false;
     }
+    leaveReqSent = false;
+
+    printf("Ostatni exit pool %d\n", getpid());
 }
 
 void *MonitorTime(void *arg) {
@@ -350,7 +404,7 @@ void *MonitorTime(void *arg) {
         current_time = time(NULL);  // Pobieramy aktualny czas w sekundach od epoki UNIX
         elapsed_time = difftime(current_time, start_time);
         // Sprawdzanie, czy minęło 10 sekund
-        if (elapsed_time >= 10) {
+        if (elapsed_time >= 1 && leaveFlag == false) {
             //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
@@ -379,21 +433,24 @@ void TimeHandler(int sig) {
 
     leaveFlag = true;
 
-    if (clientData.inPool) {
-        printf("Probuje wyjsc z basenu, PID: %d!\n", getpid());
-        ExitPool();
-    }
+//    if (clientData.inPool && leaveReqSent == false) {
+//        printf("Probuje wyjsc z basenu, PID: %d!\n", getpid());
+//        pthread_create(&testExitThread, NULL, ExitPoolThread, "");
+//        pthread_join(testExitThread, NULL);
+//    }
 
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
-
     //exit(0);
-
 }
 
 void ExitPoolHandler(int sig) {
     printf("\033[0;31;49mMam wyjsc z wody\033[0m\n");
-    ExitPool();
+    if (leaveReqSent == false)
+    {
+        pthread_create(&testExitThread, NULL, ExitPoolThread, "");
+        pthread_join(testExitThread, NULL);
+    }
 
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
