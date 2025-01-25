@@ -5,7 +5,7 @@ void SetUpLifeguard(char *code);
 void SetUpIPC();
 void* ClientIn();
 void* ClientOut();
-void PrintPoolPids();
+void PrintPoolPids(int sig);
 void ClosePoolHandler(int);
 void OpenPoolHandler(int);
 
@@ -183,11 +183,20 @@ void* ClientIn() {
 
     while (1) {
 
-        // Odbieranie zapytania od klienta
-        if (msgrcv(msgid, &msgIn, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelEnter, 0) == -1) {
-            perror("msgrcv");
-            exit(1);
+
+        while (1) {
+            if (msgrcv(msgid, &msgIn, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelEnter, 0) == -1) {
+                if (errno == EINTR) {
+                    continue;
+                } else {
+                    perror("msgrcv");
+                    exit(1);
+                }
+            }
+            break;
         }
+
+
         pthread_mutex_lock(&mutex);
 //        sem_wait(&shSem);
 
@@ -274,10 +283,20 @@ void* ClientOut() {
 
     while (1) {
         // Odbieranie zapytania od klienta
-        if (msgrcv(msgid, &msgOut, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelExit, 0) == -1) {
-            perror("msgrcv");
-            exit(1);
+
+        while (1) {
+            if (msgrcv(msgid, &msgOut, sizeof(struct LifeguardMessage) - sizeof(long), poolChannelExit, 0) == -1) {
+                if (errno == EINTR) {
+                    continue;
+                } else {
+                    perror("msgrcv");
+                    exit(1);
+                }
+            }
+            break;
         }
+
+
 //        printf("[RAT %d]Otrzymano zapytanie o wyjście od klienta PID: %d, wiek: %d\n", poolChannelExit,msgOut.pid, msgOut.age);
 //        sem_wait(&shSem);
 
@@ -353,6 +372,8 @@ void PrintPoolPids(int sig) {
     }
 
     signal(36, PrintPoolPids);
+    signal(34, ClosePoolHandler);
+    signal(35, OpenPoolHandler);
 }
 
 void ClosePoolHandler(int sig) {
@@ -361,11 +382,11 @@ void ClosePoolHandler(int sig) {
     sem_wait(&poolSem);
 
 
-//    for (int i = 0; i < pool->client_count; i++) {
-//        if (pool->pids[i] != 0) {
-//            kill(pool->pids[i], EXIT_POOL_SIGNAL);
-//        }
-//    }
+    for (int i = 0; i < pool->client_count; i++) {
+        if (pool->pids[i] != 0) {
+            kill(pool->pids[i], EXIT_POOL_SIGNAL);
+        }
+    }
 
 
     signal(34, ClosePoolHandler);
