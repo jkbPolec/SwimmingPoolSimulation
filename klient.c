@@ -43,23 +43,25 @@ struct LifeguardMessage lfgMsg;
 
 int main() {
 
+    //Ustawiamy obsługe sygnałów
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 
+    //Podstawowe parametry klienta
     SetUpClient();
 
-
+    //Jeśli klient nie jest vipem, ustawia sie w kolejce
     if (!clientData.isVIP) {
 
         pthread_create(&msgThread, NULL, QueueRoutine, "");
         pthread_join(msgThread, NULL);
     }
 
+    //Jeśli klient wszedł na basen, zwiekszamy licznik
     SemaphoreAction(1);
 
 
-
-
+    //Start watku monitorujacego, ile czasu zostalo klientowi do wyjscia
     time_t start_time = time(NULL);
     if(pthread_create(&moniotorThread, NULL, MonitorTime, (void*)&start_time) != 0)
     {
@@ -67,44 +69,30 @@ int main() {
         exit(17);
     }
 
-
-//    ChoosePool();
-//    pthread_create(&msgThread, NULL, EnterPool, "");
-//    pthread_join(msgThread, NULL);
-
-
+    //Dopóki klient moze byc na basenie i nie jest w wodzie, probuje wejsc do ktoregos basenu
     while (!leaveFlag) {
 
         while (!clientData.inPool && !leaveFlag) {
                 ChoosePool();
                 pthread_create(&msgThread, NULL, EnterPool, "");
                 pthread_join(msgThread, NULL);
+                sleep(3);
         }
     }
-//    printf("Klient %d Checkpoint\n", getpid());
+
 
     pthread_join(msgThread, NULL);
-//    printf("Watek joined %d \n", getpid());
+
+    //Jesli klient w basenie, wyjdz z niego
     if (clientData.inPool)
     {
         ExitPool();
     }
 
 
-//    // Czekanie na zakończenie wątku monitora czasu
-//    if (pthread_join(moniotorThread, NULL) != 0) {
-//        perror("pthread_join monitor");
-//    }
-//
-//    // Czekanie na zakończenie wątku dziecka, jeśli istnieje
-//    if (clientData.hasKid) {
-//        if (pthread_join(childThread, NULL) != 0) {
-//            perror("pthread_join child");
-//        }
-//    }
-
-//    printf("Klient %d konczy prace\n", getpid());
+    //Klient zmniejsza licznik, podczas opuszczania basenu
     SemaphoreAction(-1);
+
     exit(0);
 }
 
@@ -121,29 +109,36 @@ void SetUpClient() {
 
 
     srand(time(NULL) + getpid());
-    //TODO dodac dziecko, zmienic zakres wieku
     clientData.age = rand() % 70 + 1;
-    //clientData.age = 5;
     if (clientData.age < 10) {
         clientData.age = rand() % 41 + 30;
         clientData.hasKid = true;
         childData.age = rand() % 9 + 1;
-        //TODO USUNAC
-        childData.age = 3;
         if (pthread_create(&childThread, NULL, ChildThread, NULL) != 0) {
             perror("[dziecko] pthread_create");
             exit(3);
         }
 
     } else { clientData.hasKid = false;}
-    ChoosePool();
+    //ChoosePool();
 
     int VIP = rand() % 100 + 1;
     if (VIP == 1) {clientData.isVIP = true;}
     clientData.inPool = false;
 }
 
+
+/**
+ * @brief Wykonuje operację na semaforze i wyświetla wartość, jeśli jest wielokrotnością 10.
+ *
+ * @param action Operacja semafora (1 - zwiększenie, -1 - zmniejszenie).
+ * @note Używa globalnego `semID`. Upewnij się, że jest zainicjalizowany.
+ * @exit 4 - Błąd `semop`, 5 - Błąd `semctl`.
+ */
 void SemaphoreAction(int action) {
+
+
+
     struct sembuf op;
     op.sem_num = 0;
     op.sem_op = action;  // Operacja zwiększenia/zmniejszenia o 1
@@ -156,19 +151,25 @@ void SemaphoreAction(int action) {
 
     int semValue = semctl(semID, 0, GETVAL);
     if (semValue == -1) {
-        perror("semctl getval");
+        perror("semctl");
         exit(5);
     }
     if (semValue%10 == 0) {
         printf("[KLI %d][%d]Aktualna wartość semafora: %d\n", getpid(), action,semValue);
     }
 
-    //printf("Klient PID %d zwiększył wartość semafora.\n", getpid());
+//    printf("Klient PID %d zwiększył wartość semafora.\n", getpid());
 }
 
+
+/**
+ * @brief Losuje basen (1-3) i ustawia kanały wejścia i wyjścia.
+ *
+ * @note Używa globalnych zmiennych `chosenPool`, `enterPoolChannel`, `exitPoolChannel`.
+ * @exit 6 - Wylosowany basen nie istnieje.
+ */
 void ChoosePool() {
     chosenPool = rand() % 3 + 1;
-    //chosenPool = 3;
 
     switch (chosenPool) {
         case 1:
@@ -188,6 +189,7 @@ void ChoosePool() {
             exit(6);
     }
 }
+
 
 void *QueueRoutine(void* arg) {
     int key, msgid;
@@ -238,7 +240,7 @@ void *QueueRoutine(void* arg) {
         perror("msgsnd");
         exit(9);
     }
-//    printf("Klient (PID: %d) wysłał swój PID do kasjera.\n", msg.pid);
+
     msg.mtype = msg.pid;
 
     // Oczekiwanie na odpowiedź od kasjera
@@ -250,9 +252,10 @@ void *QueueRoutine(void* arg) {
     if (msg.allowed == 0) {
         printf("Klient (PID: %d): Basen zamkniety, ide do domu\n", msg.pid);
         leaveFlag = true;
+        exit(0);
     }
     else{
-        printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
+        //printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
     }
 
     return;
@@ -286,9 +289,6 @@ void *EnterPool(void* arg)
             lfgMsg.hasKid = true;
             lfgMsg.kidAge = childData.age;
         } else { lfgMsg.hasKid = false; }
-
-        //printf("Klient wysyła wiadomość na kanał: %ld\n", lfgMsg.mtype);
-
 
 
         struct msqid_ds queueInfo;
@@ -339,21 +339,13 @@ void *EnterPool(void* arg)
             //printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
             clientData.inPool = false;
         }
-
-        if (leaveFlag) {
-//            printf("Ostatni enter pool %d\n", getpid());
-        }
-
     return;
 }
 
 void ExitPool() {
 
-
-
     pthread_create(&testExitThread, NULL, ExitPoolThread, "");
     pthread_join(testExitThread, NULL);
-//    printf("Klient %d Checkpoint 2\n", getpid());
 
 }
 
@@ -375,7 +367,6 @@ void *ExitPoolThread(void* arg) {
             perror("msgctl");
             exit(18);
         }
-
         if (queueInfo.msg_qnum < MAX_CLIENT_MSG)
         {
             break;
@@ -411,29 +402,22 @@ void *ExitPoolThread(void* arg) {
     }
     leaveReqSent = false;
 
-//    printf("Ostatni exit pool %d\n", getpid());
+    return;
 }
 
 void *MonitorTime(void *arg) {
     time_t start_time = *(time_t *)arg;  // Czas startu procesu
     time_t current_time;
     double elapsed_time;
-    struct tm *local_time;
 
     while (true) {
-        current_time = time(NULL);  // Pobieramy aktualny czas w sekundach od epoki UNIX
+        current_time = time(NULL);
         elapsed_time = difftime(current_time, start_time);
         // Sprawdzanie, czy minęło 10 sekund
         if (elapsed_time >= 5 && leaveFlag == false) {
             //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
-        }
-
-        // Sprawdzanie, czy jest godzina 18:00
-        local_time = localtime(&current_time);  // Konwersja na czas lokalny
-        if (local_time->tm_hour == 18 && local_time->tm_min == 0 && local_time->tm_sec == 0) {
-            printf("Jest dokładnie godzina 18:00!\n");
         }
     }
 
@@ -453,19 +437,14 @@ void TimeHandler(int sig) {
 
     leaveFlag = true;
 
-//    if (clientData.inPool && leaveReqSent == false) {
-//        printf("Probuje wyjsc z basenu, PID: %d!\n", getpid());
-//        pthread_create(&testExitThread, NULL, ExitPoolThread, "");
-//        pthread_join(testExitThread, NULL);
-//    }
 
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
-    //exit(0);
 }
 
 void ExitPoolHandler(int sig) {
     printf("\033[0;31;49mMam wyjsc z wody\033[0m\n");
+
     if (leaveReqSent == false)
     {
         pthread_create(&testExitThread, NULL, ExitPoolThread, "");

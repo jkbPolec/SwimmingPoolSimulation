@@ -15,7 +15,18 @@ void *QueueThread(void *arg);
 int main() {
 
     signal(CASHIER_SIGNAL, TogglePool);
+
     sem_init(&queueSem, 0, 1);
+
+
+    // Sprawdzenie i ewentualne utworzenie pliku "queuefile"
+    FILE *file = fopen("queuefile", "a"); // "a" otwiera plik w trybie dopisania lub tworzy go, jeśli nie istnieje
+    if (file == NULL) {
+        perror("fopen");
+        exit(1);
+    }
+    fclose(file);
+
 
     // Generowanie klucza do kolejki
     key = ftok("queuefile", 65);
@@ -44,6 +55,7 @@ int main() {
 
     return 0;
 }
+
 
 void *QueueThread(void* arg) {
 

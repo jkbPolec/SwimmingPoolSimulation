@@ -12,6 +12,7 @@ void terminateProcesses();
 int pids[5];
 int semID;
 
+
 int main() {
     signal(SIGINT, sigintHandler);
 
@@ -66,6 +67,7 @@ int main() {
 }
 
 
+//Semafor uzywany do liczenia klientow w basenie
 void SetupSemaphore() {
 
     // Tworzenie semafora
@@ -100,6 +102,7 @@ void CreateCashier() {
     }
 }
 
+
 void CreateClients() {
     pid_t pid;
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -117,6 +120,7 @@ void CreateClients() {
         }
     }
 }
+
 
 void CreateLifeguards() {
     const int poolCodes[] = {RECREATIONAL_POOL_CODE, KIDS_POOL_CODE, OLYMPIC_POOL_CODE};
@@ -139,13 +143,14 @@ void CreateLifeguards() {
 
             char str_value[4];
             snprintf(str_value, sizeof(str_value), "%d", poolCodes[i]);
-            execl("./ratownik", "ratownik", str_value, (char *)NULL);
+            execl("./ratownik", "bebo", str_value, (char *)NULL);
 
             perror("execl ratownika failed");
             exit(1);
         }
     }
 }
+
 
 void CreateManager() {
     pid_t pid = fork();

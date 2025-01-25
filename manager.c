@@ -6,6 +6,7 @@ int shmid;
 struct PoolStatus *poolStatus;
 pid_t clientPIDs[1000];
 
+pthread_t timeThread;
 
 
 int shID, shKey;
@@ -15,6 +16,7 @@ void SetupMemory();
 void SetClosingTime();
 void SetupSemaphore();
 int CheckSemaphoreValue();
+void *CheckTime(void *arg);
 
 int main(int argc, char* argv[]) {
 
@@ -31,66 +33,15 @@ int main(int argc, char* argv[]) {
     SetupMemory();
     SetupSemaphore();
 
-    int randomPid;
-//    while (true) {
-        //usleep(1250000);
-//        randomPid = (pid_t)atoi(argv[rand() % 3 + 2]);
-        //randomPid = 2;
-//        printf("\033[1;31;40mWyslanie sygnalu zamkniecia\033[0m\n");
-
-//        kill(cashier,CASHIER_SIGNAL);
-//        usleep(5250000);
-//        printf("\033[1;31;40mWyslanie sygnalu otwarcia\033[0m\n");
-//        kill(cashier,CASHIER_SIGNAL);
-//    }
-
-
-//    sleep(2);
-//    poolStatus->isOpened = false;
-//    kill(cashier, CASHIER_SIGNAL);
-//    kill(lifeguardRec, CLOSE_POOL_SIGNAL);
-//    kill(lifeguardKid, CLOSE_POOL_SIGNAL);
-//    kill(lifeguardOly, CLOSE_POOL_SIGNAL);
-
-//    kill(lifeguardRec, OPEN_POOL_SIGNAL);
-//    kill(lifeguardKid, OPEN_POOL_SIGNAL);
-//    kill(lifeguardOly, OPEN_POOL_SIGNAL);
-//
-    sleep(3);
-    int result = system("killall -s 34 klient");
-    if (result == -1) {
-        perror("system");
-    } else {
-        printf("Wysłano sygnał 34 do wszystkich procesów 'klient'.\n");
+    // Tworzenie wątku
+    if (pthread_create(&timeThread, NULL, CheckTime, NULL) != 0) {
+        perror("pthread_create");
+        exit(1);
     }
 
 
-    while (CheckSemaphoreValue() != 0) {
+    pthread_join(timeThread, NULL);
 
-    }
-
-    printf("Wszyscy wyszli\n");
-    CheckSemaphoreValue();
-    CheckSemaphoreValue();
-    CheckSemaphoreValue();
-
-
-    while (true) {
-
-    }
-
-//    sleep(5);
-//    kill(cashier, 34);
-//    kill(lifeguardRec, 34);
-//    kill(lifeguardKid, 34);
-//    kill(lifeguardOly, 34);
-
-//    sleep(10);
-
-
-//    kill(lifeguardOly, 35);
-
-//    kill(lifeguardOly, 34);
     return 0;
 }
 
@@ -109,8 +60,6 @@ void SetupSemaphore() {
         perror("semctl");
         exit(1);
     }
-
-    printf("Semafor utworzony i zainicjalizowany na 0.\n");
 }
 
     //Funkcja sprawdza, ile klientow jest na basenie
@@ -124,10 +73,19 @@ int CheckSemaphoreValue() {
     return semValue;
 }
 
-
     //Funkcja tworzy pamiec dzielona, klienci beda sprawdzac
     //czy basen jest otwarty czy zamkniety
 void SetupMemory() {
+
+        // Sprawdzenie i ewentualne utworzenie pliku "queuefile"
+        FILE *file = fopen("poolStatus", "a"); // "a" otwiera plik w trybie dopisania lub tworzy go, jeśli nie istnieje
+        if (file == NULL) {
+            perror("fopen");
+            exit(1);
+        }
+        fclose(file);
+
+
     // Generowanie klucza do pamieci dzielonej
     shKey = ftok("poolStatus", 65);
     if (shKey == -1) {
@@ -153,6 +111,26 @@ void SetupMemory() {
 }
 
 
+void *CheckTime(void *arg) {
+    while (1) {
+        // Pobieranie aktualnego czasu
+        time_t now = time(NULL);
+        struct tm *local = localtime(&now);
+
+        // Sprawdzanie godzin i minut
+        if (local->tm_hour < 12 || (local->tm_hour == 12 && local->tm_min == 0)) {
+            printf("Jest za wczesnie na otwarcie basenu\n");
+            break;
+        } else if (local->tm_hour > 23 || (local->tm_hour == 23 && local->tm_min > 58)) {
+            printf("Przyszla pora na zamkniecie basenu\n");
+            break;
+        }
+        sleep(1);
+    }
+    return NULL;
+}
+
+
 // Funkcja czyszcząca semafor
 void CleanupSemaphore() {
     if (semctl(semID, 0, IPC_RMID) == -1) {
@@ -160,5 +138,23 @@ void CleanupSemaphore() {
         exit(1);
     }
     printf("Semafor usunięty.\n");
+}
+
+
+void ClosePools() {
+    kill(cashier, CASHIER_SIGNAL);
+
+    int result = system("killall -s 34 klient");
+    if (result == -1) {
+        perror("system");
+    } else {
+        printf("Wysłano sygnał 34 do wszystkich procesów 'klient'.\n");
+    }
+
+    while (CheckSemaphoreValue() != 0) {
+
+    }
+
+    printf("Wszyscy wyszli\n");
 }
 

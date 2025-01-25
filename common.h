@@ -40,11 +40,12 @@
 #define CASHIER_SIGNAL 36
 #define CLOSE_POOL_SIGNAL 34
 #define OPEN_POOL_SIGNAL 35
+#define PRINT_POOL_SIGNAL 36
 
 #define NUM_CLIENTS 100
-#define RECREATIONAL_POOL_SIZE          10
-#define KIDS_POOL_SIZE                  10
-#define OLYMPIC_POOL_SIZE              10
+#define RECREATIONAL_POOL_SIZE          50
+#define KIDS_POOL_SIZE                  20
+#define OLYMPIC_POOL_SIZE              30
 #define MAX_AGE 40
 
 struct message {
@@ -63,7 +64,6 @@ struct LifeguardMessage {
     int kidAge;
 };
 
-
 struct PoolStruct {
     int client_count;
     int total_age;
@@ -74,10 +74,6 @@ struct PoolStatus {
     bool isOpened;      //1 - basen otwarty, 0 - basen zakmniety
 };
 
-struct OpenHoursStruct {
-    int closingHour;  // Godzina zamknięcia (np. 18)
-    int closingMinute; // Minuta zamknięcia (np. 0)
-};
 
 
 
