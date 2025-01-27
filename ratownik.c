@@ -8,6 +8,8 @@ void* ClientOut();
 void PrintPoolPids(int sig);
 void ClosePoolHandler(int);
 void OpenPoolHandler(int);
+void SigintHandler(int);
+void CleanupResources();
 
 int poolChannelEnter, poolChannelExit, poolSize;
 int shKey, shmid;
@@ -25,6 +27,7 @@ int main(int argc, char *argv[]) {
     signal(CLOSE_POOL_SIGNAL, ClosePoolHandler);
     signal(OPEN_POOL_SIGNAL, OpenPoolHandler);
     signal(PRINT_POOL_SIGNAL, PrintPoolPids);
+    signal(SIGINT, SigintHandler);
 
     pthread_mutex_init(&mutex, NULL);
 
@@ -379,3 +382,39 @@ void OpenPoolHandler(int sig) {
     signal(PRINT_POOL_SIGNAL, PrintPoolPids);
     return 0;
 }
+
+void CleanupResources() {
+    printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
+
+    // Usunięcie pamięci dzielonej
+    if (shmdt(pool) == -1) {
+        perror("shmdt");
+    }
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+    } else {
+        printf("Pamięć dzielona usunięta.\n");
+    }
+
+    // Usunięcie semafora
+    if (sem_destroy(&poolSem) == -1) {
+        perror("sem_destroy");
+    } else {
+        printf("Semafor usunięty.\n");
+    }
+
+    // Usunięcie kolejki komunikatów
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl (IPC_RMID)");
+    } else {
+        printf("Kolejka komunikatów usunięta.\n");
+    }
+
+    exit(0);
+}
+
+void SigintHandler(int sig) {
+    printf("\033[1;31;40mOtrzymano SIGINT [RAT] (Ctrl+C). Zamykanie zasobów...\033[0m\n");
+    CleanupResources();
+}
+

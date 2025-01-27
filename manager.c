@@ -17,8 +17,12 @@ void SetClosingTime();
 void SetupSemaphore();
 int CheckSemaphoreValue();
 void *CheckTime(void *arg);
+void CleanupResources();
+void SigintHandler(int);
 
 int main(int argc, char* argv[]) {
+
+    signal(SIGINT, SigintHandler);
 
 
     if (argc != 5){
@@ -158,3 +162,34 @@ void ClosePools() {
     printf("Wszyscy wyszli\n");
 }
 
+
+void CleanupResources() {
+    printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
+
+    // Odłączanie pamięci dzielonej
+    if (shmdt(poolStatus) == -1) {
+        perror("shmdt");
+    }
+
+    // Usuwanie pamięci dzielonej
+    if (shmctl(shID, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+    } else {
+        printf("Pamięć dzielona usunięta.\n");
+    }
+
+    // Usuwanie semafora
+    if (semctl(semID, 0, IPC_RMID) == -1) {
+        perror("semctl remove");
+    } else {
+        printf("Semafor usunięty.\n");
+    }
+
+    exit(0);
+}
+
+
+void SigintHandler(int sig) {
+    printf("\033[1;31;40mOtrzymano SIGINT [MAN] (Ctrl+C). Zamykanie zasobów...\033[0m\n");
+    CleanupResources();
+}

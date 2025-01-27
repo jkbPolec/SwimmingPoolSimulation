@@ -28,7 +28,8 @@ void* MonitorTime(void*);
 void *ExitPoolThread(void* arg);
 void TimeHandler(int sig);
 void ExitPoolHandler(int sig);
-
+void CleanupResources();
+void SigintHandler(int);
 
 struct ClientData clientData;
 struct ChildData childData;
@@ -46,6 +47,7 @@ int main() {
     //Ustawiamy obsługe sygnałów
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
+    signal(SIGINT, SigintHandler);
 
     //Podstawowe parametry klienta
     SetUpClient();
@@ -95,7 +97,6 @@ int main() {
 
     exit(0);
 }
-
 
 
 void SetUpClient() {
@@ -191,6 +192,7 @@ void ChoosePool() {
 }
 
 
+
 void *QueueRoutine(void* arg) {
     int key, msgid;
     struct message msg;
@@ -259,8 +261,6 @@ void *QueueRoutine(void* arg) {
     }
 
     return;
-
-
 }
 
 void *EnterPool(void* arg)
@@ -454,3 +454,30 @@ void ExitPoolHandler(int sig) {
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 }
+
+
+void CleanupResources() {
+    printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
+
+    // Usuwanie kolejki komunikatów do ratowników
+    if (lfgMsgID != 0 && msgctl(lfgMsgID, IPC_RMID, NULL) == -1) {
+        perror("msgctl (lfgMsgID)");
+    } else {
+        printf("Kolejka komunikatów do ratowników usunięta.\n");
+    }
+
+    // Usuwanie semafora
+    if (semID != 0 && semctl(semID, 0, IPC_RMID) == -1) {
+        perror("semctl remove");
+    } else {
+        printf("Semafor usunięty.\n");
+    }
+
+    exit(0);
+}
+
+void SigintHandler(int sig) {
+    printf("\033[1;31;40mOtrzymano SIGINT (Ctrl+C). Zamykanie zasobów...\033[0m\n");
+    CleanupResources();
+}
+

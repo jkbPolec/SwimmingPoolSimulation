@@ -56,13 +56,11 @@ int main() {
         }
     }
 
-    while (true) {
 
-    }
+    printf("Wszyscy klienci przetworzeni\n");
+    sleep(1);
 
     terminateProcesses();
-
-
     return 0;
 }
 
@@ -143,7 +141,7 @@ void CreateLifeguards() {
 
             char str_value[4];
             snprintf(str_value, sizeof(str_value), "%d", poolCodes[i]);
-            execl("./ratownik", "bebo", str_value, (char *)NULL);
+            execl("./ratownik", "ratownik", str_value, (char *)NULL);
 
             perror("execl ratownika failed");
             exit(1);
@@ -179,15 +177,13 @@ void CreateManager() {
 // Funkcja do zakończenia procesów
 void terminateProcesses() {
     for (int i = 0; i < 5; ++i) {
-        kill(pids[i], SIGKILL);
+        kill(pids[i], SIGINT);
     }
-    system("./clean.sh");
 }
 
 
 void sigintHandler(int sig) {
     printf("\nCtrl+C wciśnięte. Zakończenie procesów...\n");
     terminateProcesses();
-    system("./clean.sh");
     exit(0); // Opcjonalnie zakończ program po zakończeniu procesów
 }

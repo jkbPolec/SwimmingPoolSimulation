@@ -11,9 +11,12 @@ sem_t queueSem;
 
 void TogglePool(int);
 void *QueueThread(void *arg);
+void CleanupResources();
+void SigintHandler(int);
 
 int main() {
 
+    signal(SIGINT, SigintHandler);
     signal(CASHIER_SIGNAL, TogglePool);
 
     sem_init(&queueSem, 0, 1);
@@ -47,10 +50,7 @@ int main() {
         exit(1);
     }
 
-    while (true)
-    {
-
-    }
+    pthread_join(queueThread, NULL);
 
 
     return 0;
@@ -124,4 +124,31 @@ void TogglePool(int sig) {
 
     signal(CASHIER_SIGNAL, TogglePool);
 
+}
+
+// Funkcja do usuwania semaforów i kolejki komunikatów
+void CleanupResources() {
+    printf("\n\033[1;33;40mUsuwanie zasobów...\033[0m\n");
+
+    // Usuwanie kolejki komunikatów
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl (IPC_RMID)");
+    } else {
+        printf("Kolejka komunikatów usunięta.\n");
+    }
+
+    // Usuwanie semafora
+    if (sem_destroy(&queueSem) == -1) {
+        perror("sem_destroy");
+    } else {
+        printf("Semafor usunięty.\n");
+    }
+
+    exit(0);
+}
+
+// Handler sygnału SIGINT
+void SigintHandler(int sig) {
+    printf("\n\033[1;31;40mOtrzymano SIGINT [KAS] (Ctrl+C). Kończenie programu...\033[0m\n");
+    CleanupResources();
 }
