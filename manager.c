@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 void SetupSemaphore() {
 
     // Tworzenie semafora
-    semID = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
+    semID = semget(SEM_KEY, 1, 0600 | IPC_CREAT);
     if (semID == -1) {
         perror("semget");
         exit(1);

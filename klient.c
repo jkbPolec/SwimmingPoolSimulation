@@ -242,7 +242,7 @@ void *QueueRoutine(void* arg) {
         perror("msgsnd");
         exit(9);
     }
-
+    printf("[KLI %d] Ustawiam sie w kolejce\n", getpid());
     msg.mtype = msg.pid;
 
     // Oczekiwanie na odpowiedź od kasjera
@@ -252,12 +252,12 @@ void *QueueRoutine(void* arg) {
     }
 
     if (msg.allowed == 0) {
-        printf("Klient (PID: %d): Basen zamkniety, ide do domu\n", msg.pid);
+        printf("Klient (PID: %d): Basen \033[1;39;41mzamkniety\033[0m, ide do domu\n", msg.pid);
         leaveFlag = true;
         exit(0);
     }
     else{
-        //printf("Klient (PID: %d) otrzymał odpowiedź od kasjera.\n", msg.pid);
+        printf("[KLI %d] \033[1;39;42mwchodze\033[0m na basen\n", msg.pid);
     }
 
     return;
@@ -306,7 +306,7 @@ void *EnterPool(void* arg)
         }
 
         // Wysłanie zapytania do ratownika
-//        printf("Klient PID: %d wysyła wiadomość na kanał: %ld\n", getpid(),lfgMsg.mtype);
+        printf("[KLI %d] próbuje wejść do basenu numer %ld\n", getpid(),lfgMsg.mtype);
         if (msgsnd(lfgMsgID, &lfgMsg, sizeof(struct LifeguardMessage) - sizeof(long), 0) == -1) {
             perror("msgsnd");
             exit(13);
@@ -413,8 +413,7 @@ void *MonitorTime(void *arg) {
     while (true) {
         current_time = time(NULL);
         elapsed_time = difftime(current_time, start_time);
-        // Sprawdzanie, czy minęło 10 sekund
-        if (elapsed_time >= 5 && leaveFlag == false) {
+        if (elapsed_time >= 1 && leaveFlag == false) {
             //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
@@ -433,7 +432,7 @@ void *ChildThread(void *arg) {
 }
 
 void TimeHandler(int sig) {
-    printf("Sygnal do wyjscia PID: %d!\n", getpid());
+    //printf("Sygnal do wyjscia PID: %d!\n", getpid());
 
     leaveFlag = true;
 
@@ -454,7 +453,6 @@ void ExitPoolHandler(int sig) {
     signal(34, TimeHandler);
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 }
-
 
 void CleanupResources() {
     printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");

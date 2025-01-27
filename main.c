@@ -1,6 +1,5 @@
 #include "common.h"
 
-void SetupSemaphore();
 void CreateCashier();
 void CreateClients();
 void CreateLifeguards();
@@ -26,7 +25,6 @@ int main() {
     //-------------------Tworzenie menedźera
     CreateManager();
 
-    SetupSemaphore();
 
     sleep(1);
     printf("\033[1;32;40m---------------Początek pracy basenu---------------\033[0m\n");
@@ -64,25 +62,6 @@ int main() {
     return 0;
 }
 
-
-//Semafor uzywany do liczenia klientow w basenie
-void SetupSemaphore() {
-
-    // Tworzenie semafora
-    semID = semget(SEM_KEY, 1, 0666 | IPC_CREAT);
-    if (semID == -1) {
-        perror("semget");
-        exit(1);
-    }
-
-    // Inicjalizacja semafora na 0
-    if (semctl(semID, 0, SETVAL, 0) == -1) {
-        perror("semctl");
-        exit(1);
-    }
-
-    printf("Semafor utworzony i zainicjalizowany na 0.\n");
-}
 
 
 void CreateCashier() {

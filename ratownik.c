@@ -79,6 +79,7 @@ void SetUpLifeguard(char *code) {
 
     int poolCode = atoi(code);
 
+
     switch (poolCode) {
         case RECREATIONAL_POOL_CODE:
             poolSize = RECREATIONAL_POOL_SIZE;
@@ -119,6 +120,17 @@ void SetUpLifeguard(char *code) {
 
 void SetUpIPC() {
 
+
+    const char *files[] = {"poolKid", "poolRec", "poolOly"};
+    // Sprawdzenie i ewentualne utworzenie pliku "poolKid"
+    for (int i = 0; i < 3; i++) {
+        FILE *file = fopen(files[i], "a"); // "a" otwiera lub tworzy plik
+        if (file == NULL) {
+            perror("fopen");
+            exit(1);
+        }
+        fclose(file);
+    }
 
     //-------------------Tworzenie pamieci dzielonej basenu
 
@@ -246,10 +258,10 @@ void* ClientIn() {
             }
 
             msgIn.allowed = 1;
-            printf("[RAT %d]Klient PID: %d wpuszczony do basenu %d.\n", poolChannelEnter,msgIn.pid, poolChannelEnter);
+            printf("\033[1;34;49m[RAT %d]Klient PID: %d \033[0m\033[1;34;42mwpuszczony\033[0m\033[1;34;49m do basenu %d\033[0m\n", poolChannelEnter,msgIn.pid, poolChannelEnter);
         } else {
             msgIn.allowed = 0;
-            printf("[RAT %d]Klient PID: %d nie został wpuszczony do basenu %d. Powód: \n%s", poolChannelEnter,msgIn.pid, poolChannelEnter, reason);
+            printf("\033[1;34;49m[RAT %d]Klient PID: %d \033[0m\033[1;34;41mnie został wpuszczony\033[0m\033[1;34;49m do basenu %d. Powód: \033[0m\n%s", poolChannelEnter,msgIn.pid, poolChannelEnter, reason);
         }
 
         // Wysyłanie odpowiedzi do klienta
@@ -263,8 +275,6 @@ void* ClientIn() {
 
     }
 
-
-    printf("KONIEC WATKUKONIEC WATKUKONIEC WATKUKONIEC \n");
 
 }
 
@@ -318,12 +328,12 @@ void* ClientOut() {
 
         if (found) {
 
-            printf("[RAT %d]Klient PID: %d dostal pozwolenie na opuszczenie basenu.\n", poolChannelExit,client_pid);
+            printf("\033[1;34;49m[RAT %d]Klient PID: %d dostal pozwolenie na opuszczenie basenu.\033[0m\n", poolChannelExit,client_pid);
             msgOut.allowed = 1;
         }
         else
         {
-            printf("[RAT %d]Klient PID: %d nie został znaleziony w basenie.\n", poolChannelExit,client_pid);
+            printf("\033[1;34;49m[RAT %d]Klient PID: %d nie został znaleziony w basenie.\033[0m\n", poolChannelExit,client_pid);
             msgOut.allowed = 0;
         }
 
