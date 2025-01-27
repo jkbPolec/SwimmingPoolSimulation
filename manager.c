@@ -16,9 +16,9 @@ void SetupMemory();
 void SetClosingTime();
 void SetupSemaphore();
 int CheckSemaphoreValue();
-void *CheckTime(void *arg);
+void *CheckTime();
 void CleanupResources();
-void SigintHandler(int);
+void SigintHandler();
 
 int main(int argc, char* argv[]) {
 
@@ -50,6 +50,11 @@ int main(int argc, char* argv[]) {
 }
 
     //Funkcja tworzy semafor, potrzebny do monitorowania ilosci klientow na basenie
+/**
+* @brief Tworzy i inicjalizuje semafor dla monitorowania klientów na basenie.
+*
+* @note Używa globalnej zmiennej `semID`.
+*/
 void SetupSemaphore() {
 
     // Tworzenie semafora
@@ -67,6 +72,11 @@ void SetupSemaphore() {
 }
 
     //Funkcja sprawdza, ile klientow jest na basenie
+/**
+ * @brief Sprawdza bieżącą wartość semafora.
+ *
+ * @return Wartość semafora.
+ */
 int CheckSemaphoreValue() {
     int semValue = semctl(semID, 0, GETVAL);
     if (semValue == -1) {
@@ -79,6 +89,11 @@ int CheckSemaphoreValue() {
 
     //Funkcja tworzy pamiec dzielona, klienci beda sprawdzac
     //czy basen jest otwarty czy zamkniety
+/**
+ * @brief Inicjalizuje pamięć dzieloną dla statusu basenu.
+ *
+ * @note Używa globalnych zmiennych `shKey`, `shID` i `poolStatus`.
+ */
 void SetupMemory() {
 
         // Sprawdzenie i ewentualne utworzenie pliku "queuefile"
@@ -115,7 +130,12 @@ void SetupMemory() {
 }
 
 
-void *CheckTime(void *arg) {
+/**
+ * @brief Wątek monitorujący czas pracy basenu.
+ *
+ * @note Wątek sprawdza godzinę i zamyka basen po wyznaczonym czasie.
+ */
+void *CheckTime() {
     while (1) {
         // Pobieranie aktualnego czasu
         time_t now = time(NULL);
@@ -125,7 +145,7 @@ void *CheckTime(void *arg) {
         if (local->tm_hour < 12 || (local->tm_hour == 12 && local->tm_min == 0)) {
             printf("Jest za wczesnie na otwarcie basenu\n");
             break;
-        } else if (local->tm_hour > 23 || (local->tm_hour == 23 && local->tm_min > 58)) {
+        } else if (local->tm_hour > 23 || (local->tm_hour == 22 && local->tm_min > 51)) {
             printf("Przyszla pora na zamkniecie basenu\n");
             break;
         }
@@ -144,7 +164,10 @@ void CleanupSemaphore() {
     printf("Semafor usunięty.\n");
 }
 
-
+/**
+ * @brief Wysyła sygnał do wyjścia i kończy program
+ *
+ */
 void ClosePools() {
     kill(cashier, CASHIER_SIGNAL);
 
@@ -162,7 +185,11 @@ void ClosePools() {
     printf("Wszyscy wyszli\n");
 }
 
-
+/**
+ * @brief Czyści zasoby używane przez program.
+ *
+ * @note Usuwa pamięć dzieloną i semafory.
+ */
 void CleanupResources() {
     printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
 
@@ -188,8 +215,12 @@ void CleanupResources() {
     exit(0);
 }
 
-
-void SigintHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał SIGINT (Ctrl+C) i zamyka zasoby.
+ *
+ * @note Wywołuje funkcję `CleanupResources()`.
+ */
+void SigintHandler() {
     printf("\033[1;31;40mOtrzymano SIGINT [MAN] (Ctrl+C). Zamykanie zasobów...\033[0m\n");
     CleanupResources();
 }

@@ -5,10 +5,10 @@ void SetUpLifeguard(char *code);
 void SetUpIPC();
 void* ClientIn();
 void* ClientOut();
-void PrintPoolPids(int sig);
-void ClosePoolHandler(int);
-void OpenPoolHandler(int);
-void SigintHandler(int);
+void PrintPoolPids();
+void ClosePoolHandler();
+void OpenPoolHandler();
+void SigintHandler();
 void CleanupResources();
 
 int poolChannelEnter, poolChannelExit, poolSize;
@@ -74,7 +74,11 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
+/**
+ * @brief Inicjalizuje ustawienia dla ratownika na podstawie kodu basenu.
+ *
+ * @param code Kod basenu (rekreacyjny, dla dzieci, olimpijski).
+ */
 void SetUpLifeguard(char *code) {
 
     int poolCode = atoi(code);
@@ -118,6 +122,11 @@ void SetUpLifeguard(char *code) {
 
 }
 
+/**
+ * @brief Ustawia komunikację międzyprocesową dla ratownika.
+ *
+ * @note Tworzy pamięć dzieloną i kolejkę komunikatów.
+ */
 void SetUpIPC() {
 
 
@@ -189,6 +198,11 @@ void SetUpIPC() {
 
 }
 
+/**
+ * @brief Obsługuje wątki klientów wchodzących do basenu.
+ *
+ * @note Wątek przetwarza zapytania klientów i decyduje o ich wejściu.
+ */
 void* ClientIn() {
 
     int semValue;
@@ -273,11 +287,17 @@ void* ClientIn() {
 
         pthread_mutex_unlock(&mutex);
 
+        PrintPoolPids(0);
     }
 
 
 }
 
+/**
+ * @brief Obsługuje wątki klientów opuszczających basen.
+ *
+ * @note Wątek usuwa klientów z pamięci basenu i wysyła odpowiedzi.
+ */
 void* ClientOut() {
     int client_pid, found, client_age;
 
@@ -345,11 +365,17 @@ void* ClientOut() {
         }
 
         pthread_mutex_unlock(&mutex);
+        PrintPoolPids(0);
     }
 
 }
 
-void PrintPoolPids(int sig) {
+/**
+ * @brief Wyświetla listę PID klientów w basenie.
+ *
+ * @note Funkcja wywoływana jako handler sygnału.
+ */
+void PrintPoolPids() {
 
     printf("\033[4;39;49m[RAT %d]Lista PID klientów w basenie:\033[0m\n", poolChannelEnter);
     for (int i = 0; i < pool->client_count; i++) {
@@ -361,7 +387,12 @@ void PrintPoolPids(int sig) {
     signal(36, PrintPoolPids);
 }
 
-void ClosePoolHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał zamknięcia basenu.
+ *
+ * @note Zamienia wartość semafora i wysyła sygnały wyjścia do klientów.
+ */
+void ClosePoolHandler() {
     printf("\033[1;31;40m-------------[RAT %d] Zamknięcie basenu-------------\033[0m\n", poolChannelEnter);
 
     sem_wait(&poolSem);
@@ -382,7 +413,12 @@ void ClosePoolHandler(int sig) {
     return 0;
 }
 
-void OpenPoolHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał otwarcia basenu.
+ *
+ * @note Odblokowuje semafor i otwiera dostęp do basenu.
+ */
+void OpenPoolHandler() {
     printf("\033[1;32;40m-------------[RAT %d] Otwarcie basenu-------------\033[0m\n", poolChannelEnter);
     sem_post(&poolSem); // Odblokowanie dostępu do basenu
     printf("Zakonczono oblsuge watku otwarcia\n");
@@ -390,9 +426,13 @@ void OpenPoolHandler(int sig) {
     signal(CLOSE_POOL_SIGNAL, ClosePoolHandler);
     signal(OPEN_POOL_SIGNAL, OpenPoolHandler);
     signal(PRINT_POOL_SIGNAL, PrintPoolPids);
-    return 0;
 }
 
+/**
+ * @brief Czyści zasoby używane przez program.
+ *
+ * @note Usuwa pamięć dzieloną i semafory.
+ */
 void CleanupResources() {
     printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
 
@@ -423,7 +463,12 @@ void CleanupResources() {
     exit(0);
 }
 
-void SigintHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał SIGINT (Ctrl+C) i zamyka zasoby.
+ *
+ * @note Wywołuje funkcję `CleanupResources()`.
+ */
+void SigintHandler() {
     printf("\033[1;31;40mOtrzymano SIGINT [RAT] (Ctrl+C). Zamykanie zasobów...\033[0m\n");
     CleanupResources();
 }

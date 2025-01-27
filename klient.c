@@ -16,20 +16,20 @@ struct ChildData {
 
 void SetUpClient();
 void ChoosePool();
-void *QueueRoutine(void*);
-void *EnterPool(void*);
+void *QueueRoutine();
+void *EnterPool();
 void ExitPool();
 void SemaphoreAction(int action);
 
 
 
-void* ChildThread(void*);
+void* ChildThread();
 void* MonitorTime(void*);
-void *ExitPoolThread(void* arg);
-void TimeHandler(int sig);
-void ExitPoolHandler(int sig);
+void *ExitPoolThread();
+void TimeHandler();
+void ExitPoolHandler();
 void CleanupResources();
-void SigintHandler(int);
+void SigintHandler();
 
 struct ClientData clientData;
 struct ChildData childData;
@@ -78,7 +78,7 @@ int main() {
                 ChoosePool();
                 pthread_create(&msgThread, NULL, EnterPool, "");
                 pthread_join(msgThread, NULL);
-                sleep(3);
+                sleep(5);
         }
     }
 
@@ -98,7 +98,13 @@ int main() {
     exit(0);
 }
 
-
+/**
+ * @brief Inicjalizuje dane klienta i dziecka.
+ *
+ * @note Używa globalnych zmiennych `clientData` i `childData`.
+ * @exit 2 - Błąd przy uzyskaniu semafora.
+ * @exit 3 - Błąd przy tworzeniu wątku dla dziecka.
+ */
 void SetUpClient() {
 
     // Łączenie się z istniejącym semaforem
@@ -171,7 +177,6 @@ void SemaphoreAction(int action) {
  */
 void ChoosePool() {
     chosenPool = rand() % 3 + 1;
-
     switch (chosenPool) {
         case 1:
             enterPoolChannel = RECREATIONAL_ENTER_CHANNEL;
@@ -192,8 +197,11 @@ void ChoosePool() {
 }
 
 
-
-void *QueueRoutine(void* arg) {
+/**
+ * @brief Obsługuje ustawianie klienta w kolejce do kasjera.
+ *
+ */
+void *QueueRoutine() {
     int key, msgid;
     struct message msg;
 
@@ -260,10 +268,13 @@ void *QueueRoutine(void* arg) {
         printf("[KLI %d] \033[1;39;42mwchodze\033[0m na basen\n", msg.pid);
     }
 
-    return;
 }
 
-void *EnterPool(void* arg)
+/**
+ * @brief Wątek obsługujący wysyłanie żądania wejścia do basenu.
+ *
+ */
+void *EnterPool()
 {
 
 
@@ -339,9 +350,15 @@ void *EnterPool(void* arg)
             //printf("Klient PID: %d nie wchodzi na basen %d.\n", getpid(), enterPoolChannel);
             clientData.inPool = false;
         }
-    return;
+
+    return NULL;
 }
 
+/**
+ * @brief Obsługuje proces wychodzenia klienta z basenu.
+ *
+ * @note Używa globalnych zmiennych `testExitThread` i `clientData`.
+ */
 void ExitPool() {
 
     pthread_create(&testExitThread, NULL, ExitPoolThread, "");
@@ -349,7 +366,11 @@ void ExitPool() {
 
 }
 
-void *ExitPoolThread(void* arg) {
+/**
+ * @brief Wątek obsługujący wysyłanie żądania wyjścia z basenu.
+ *
+ */
+void *ExitPoolThread() {
     leaveReqSent = true;
 
 
@@ -401,10 +422,15 @@ void *ExitPoolThread(void* arg) {
         clientData.inPool = false;
     }
     leaveReqSent = false;
-
-    return;
+    return NULL;
 }
 
+/**
+ * @brief Monitoruje czas pozostały klientowi na basenie.
+ *
+ * @param arg Wskaźnik na czas startu procesu.
+ * @note Używa globalnej zmiennej `leaveFlag`.
+ */
 void *MonitorTime(void *arg) {
     time_t start_time = *(time_t *)arg;  // Czas startu procesu
     time_t current_time;
@@ -414,7 +440,6 @@ void *MonitorTime(void *arg) {
         current_time = time(NULL);
         elapsed_time = difftime(current_time, start_time);
         if (elapsed_time >= 1 && leaveFlag == false) {
-            //printf("Minęło 5 sekund od startu programu!\n");
             raise(34);
             break;
         }
@@ -423,7 +448,12 @@ void *MonitorTime(void *arg) {
     return NULL;
 }
 
-void *ChildThread(void *arg) {
+/**
+ * @brief Wątek obsługujący zachowanie dziecka na basenie.
+ *
+ * @note Wątek działa dopóki flaga `leaveFlag` nie zostanie ustawiona na true.
+ */
+void *ChildThread() {
     printf("Jestem dzieckiem!\n");
 
     while (!leaveFlag) {
@@ -431,7 +461,13 @@ void *ChildThread(void *arg) {
     return NULL;
 }
 
-void TimeHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał końca czasu dla klienta.
+ *
+ * @param sig Numer sygnału.
+ * @note Ustawia flagę `leaveFlag` na true.
+ */
+void TimeHandler() {
     //printf("Sygnal do wyjscia PID: %d!\n", getpid());
 
     leaveFlag = true;
@@ -441,7 +477,13 @@ void TimeHandler(int sig) {
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 }
 
-void ExitPoolHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał wyjścia klienta z wody.
+ *
+ * @param sig Numer sygnału.
+ * @note Tworzy wątek do obsługi wyjścia, jeśli flaga `leaveReqSent` jest false.
+ */
+void ExitPoolHandler() {
     printf("\033[0;31;49mMam wyjsc z wody\033[0m\n");
 
     if (leaveReqSent == false)
@@ -454,6 +496,11 @@ void ExitPoolHandler(int sig) {
     signal(EXIT_POOL_SIGNAL, ExitPoolHandler);
 }
 
+/**
+ * @brief Czyści zasoby używane przez program.
+ *
+ * @note Usuwa kolejki komunikatów i semafory.
+ */
 void CleanupResources() {
     printf("\033[1;33;40mUsuwanie zasobów...\033[0m\n");
 
@@ -474,7 +521,13 @@ void CleanupResources() {
     exit(0);
 }
 
-void SigintHandler(int sig) {
+/**
+ * @brief Obsługuje sygnał SIGINT (Ctrl+C) i zamyka zasoby.
+ *
+ * @param sig Numer sygnału.
+ * @note Wywołuje funkcję `CleanupResources()`.
+ */
+void SigintHandler() {
     printf("\033[1;31;40mOtrzymano SIGINT (Ctrl+C). Zamykanie zasobów...\033[0m\n");
     CleanupResources();
 }

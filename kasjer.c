@@ -9,10 +9,10 @@ struct message msg;
 sem_t queueSem;
 
 
-void TogglePool(int);
-void *QueueThread(void *arg);
+void TogglePool();
+void *QueueThread();
 void CleanupResources();
-void SigintHandler(int);
+void SigintHandler();
 
 int main() {
 
@@ -56,8 +56,12 @@ int main() {
     return 0;
 }
 
-
-void *QueueThread(void* arg) {
+/**
+ * @brief Wątek obsługujący komunikację w kolejce.
+ *
+ * @note Obsługuje odbieranie i wysyłanie wiadomości klientów w kolejce.
+ */
+void *QueueThread() {
 
     printf("Kasjer gotowy do odbierania wiadomości...\n");
     int val;
@@ -105,11 +109,16 @@ void *QueueThread(void* arg) {
         }
     }
 
-
+    return NULL;
 }
 
-
-void TogglePool(int sig) {
+/**
+ * @brief Obsługuje sygnał otwierania/zamykania kolejki.
+ *
+ * @param sig Numer sygnału.
+ * @note Zmienia wartość semafora `queueSem`.
+ */
+void TogglePool() {
     int val;
 
     sem_getvalue(&queueSem, &val);
@@ -127,6 +136,12 @@ void TogglePool(int sig) {
 }
 
 // Funkcja do usuwania semaforów i kolejki komunikatów
+
+/**
+ * @brief Czyści zasoby używane przez program.
+ *
+ * @note Usuwa kolejkę komunikatów i semafory.
+ */
 void CleanupResources() {
     printf("\n\033[1;33;40mUsuwanie zasobów...\033[0m\n");
 
@@ -148,7 +163,14 @@ void CleanupResources() {
 }
 
 // Handler sygnału SIGINT
-void SigintHandler(int sig) {
+
+/**
+ * @brief Obsługuje sygnał SIGINT (Ctrl+C) i zamyka zasoby.
+ *
+ * @param sig Numer sygnału.
+ * @note Wywołuje funkcję `CleanupResources()`.
+ */
+void SigintHandler() {
     printf("\n\033[1;31;40mOtrzymano SIGINT [KAS] (Ctrl+C). Kończenie programu...\033[0m\n");
     CleanupResources();
 }

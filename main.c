@@ -5,7 +5,7 @@ void CreateClients();
 void CreateLifeguards();
 void CreateManager();
 
-void sigintHandler(int sig);
+void sigintHandler();
 void terminateProcesses();
 
 int pids[5];
@@ -63,7 +63,11 @@ int main() {
 }
 
 
-
+/**
+ * @brief Tworzy proces kasjera.
+ *
+ * @note Używa funkcji `fork()` do utworzenia procesu potomnego.
+ */
 void CreateCashier() {
     pid_t pid = fork();
     if (pid < 0) {
@@ -79,7 +83,11 @@ void CreateCashier() {
     }
 }
 
-
+/**
+ * @brief Tworzy procesy klientów.
+ *
+ * @note Używa funkcji `fork()` do tworzenia procesów klientów.
+ */
 void CreateClients() {
     pid_t pid;
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -98,7 +106,11 @@ void CreateClients() {
     }
 }
 
-
+/**
+ * @brief Tworzy procesy ratowników.
+ *
+ * @note Ustawia odpowiednie kanały komunikacji dla każdego basenu.
+ */
 void CreateLifeguards() {
     const int poolCodes[] = {RECREATIONAL_POOL_CODE, KIDS_POOL_CODE, OLYMPIC_POOL_CODE};
     const char *messages[] = {
@@ -128,7 +140,11 @@ void CreateLifeguards() {
     }
 }
 
-
+/**
+ * @brief Tworzy proces menedżera basenu.
+ *
+ * @note Przekazuje PID-y procesów jako argumenty do menedżera.
+ */
 void CreateManager() {
     pid_t pid = fork();
     if (pid < 0) {
@@ -154,6 +170,11 @@ void CreateManager() {
 }
 
 // Funkcja do zakończenia procesów
+/**
+ * @brief Kończy wszystkie procesy związane z basenem.
+ *
+ * @note Wysyła sygnał SIGINT do wszystkich procesów.
+ */
 void terminateProcesses() {
     for (int i = 0; i < 5; ++i) {
         kill(pids[i], SIGINT);
@@ -161,7 +182,7 @@ void terminateProcesses() {
 }
 
 
-void sigintHandler(int sig) {
+void sigintHandler() {
     printf("\nCtrl+C wciśnięte. Zakończenie procesów...\n");
     terminateProcesses();
     exit(0); // Opcjonalnie zakończ program po zakończeniu procesów

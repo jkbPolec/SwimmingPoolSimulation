@@ -42,10 +42,10 @@
 #define OPEN_POOL_SIGNAL 35
 #define PRINT_POOL_SIGNAL 36
 
-#define NUM_CLIENTS 10
-#define RECREATIONAL_POOL_SIZE          5000
-#define KIDS_POOL_SIZE                  1000
-#define OLYMPIC_POOL_SIZE              3000
+#define NUM_CLIENTS 1000
+#define RECREATIONAL_POOL_SIZE          50
+#define KIDS_POOL_SIZE                  30
+#define OLYMPIC_POOL_SIZE              30
 #define MAX_AGE 40
 
 struct message {
